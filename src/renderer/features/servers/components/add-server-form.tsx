@@ -54,7 +54,7 @@ export const AddServerForm = () => {
                 <Button
                     loading={isLoading}
                     onClick={() => {
-                        window.location.href = `https://emos.best/link?uuid=${EMOS_MUSIC_LINK_UUID}&name=${EMOS_MUSIC_NAME}&url=${EMOS_MUSIC_URL}`;
+                        window.location.href = `https://emos.best/link?uuid=${EMOS_MUSIC_LINK_UUID}&name=${EMOS_MUSIC_NAME}&url=${EMOS_MUSIC_URL}/feishin`;
                     }}
                     variant="filled"
                 >

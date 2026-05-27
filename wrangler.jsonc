@@ -24,6 +24,11 @@
             "zone_name": "emos.best"
         },
         {
+            // emos link 回调用
+            "pattern": "music.emos.best/feishin*",
+            "zone_name": "emos.best"
+        },
+        {
             "pattern": "music.emos.best/favicon*",
             "zone_name": "emos.best"
         },

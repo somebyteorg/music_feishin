@@ -433,6 +433,7 @@ export const openReleaseNotesModal = (title: string) => {
 };
 
 export const ReleaseNotesModal = () => {
+    return null;
     const { version } = packageJson;
     const { t } = useTranslation();
     const dismissRef = useRef<(() => void) | null>(null);

@@ -37,7 +37,7 @@ export const ServerRequired = () => {
                     {!isServerLock() && (
                         <>
                             <Divider my="lg" />
-                            <AddServerForm onCancel={null} />
+                            <AddServerForm />
                         </>
                     )}
                 </Stack>
@@ -45,7 +45,7 @@ export const ServerRequired = () => {
         );
     }
 
-    return <AddServerForm onCancel={null} />;
+    return <AddServerForm />;
 };
 
 function ServerSelector() {

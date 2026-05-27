@@ -46,7 +46,7 @@ export default defineConfig({
                 sourcemapExcludeSources: false,
             },
         },
-        sourcemap: true,
+        sourcemap: false,
     },
     css: {
         modules: {
@@ -112,7 +112,7 @@ export default defineConfig({
                         type: 'image/png',
                     },
                 ],
-                name: 'Feishin',
+                name: '跃律',
                 orientation: 'portrait',
                 screenshots: [
                     {
@@ -123,7 +123,7 @@ export default defineConfig({
                         type: 'image/webp',
                     },
                 ],
-                short_name: 'Feishin',
+                short_name: 'PitchHop',
                 start_url: '/',
                 theme_color: '#1E003D',
             },

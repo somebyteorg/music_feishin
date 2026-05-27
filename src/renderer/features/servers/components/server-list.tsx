@@ -15,7 +15,6 @@ import { Button } from '/@/shared/components/button/button';
 import { Divider } from '/@/shared/components/divider/divider';
 import { Group } from '/@/shared/components/group/group';
 import { Icon } from '/@/shared/components/icon/icon';
-import { ContextModalVars } from '/@/shared/components/modal/modal';
 import { Stack } from '/@/shared/components/stack/stack';
 import { Text } from '/@/shared/components/text/text';
 import { ServerType } from '/@/shared/types/domain-types';
@@ -29,9 +28,7 @@ export const ServerList = () => {
     const handleAddServerModal = () => {
         openContextModal({
             innerProps: {
-                modalBody: (vars: ContextModalVars) => (
-                    <AddServerForm onCancel={() => vars.context.closeModal(vars.id)} />
-                ),
+                modalBody: () => <AddServerForm />,
             },
             modal: 'base',
             title: t('form.addServer.title'),

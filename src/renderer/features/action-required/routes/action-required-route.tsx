@@ -5,9 +5,9 @@ import { Navigate } from 'react-router';
 import { PageHeader } from '/@/renderer/components/page-header/page-header';
 import { ActionRequiredContainer } from '/@/renderer/features/action-required/components/action-required-container';
 import { ServerCredentialRequired } from '/@/renderer/features/action-required/components/server-credential-required';
-import { ServerRequired } from '/@/renderer/features/action-required/components/server-required';
 import { isServerLock } from '/@/renderer/features/action-required/utils/window-properties';
 import LoginRoute from '/@/renderer/features/login/routes/login-route';
+import { AddServerForm } from '/@/renderer/features/servers/components/add-server-form';
 import { ServerList } from '/@/renderer/features/servers/components/server-list';
 import { AnimatedPage } from '/@/renderer/features/shared/components/animated-page';
 import { PageErrorBoundary } from '/@/renderer/features/shared/components/page-error-boundary';
@@ -35,8 +35,8 @@ const ActionRequiredRoute = () => {
             valid: !isCredentialRequired,
         },
         {
-            component: <ServerRequired />,
-            title: t('error.serverRequired'),
+            component: <AddServerForm />,
+            title: '欢迎来到 跃律',
             valid: !isServerRequired,
         },
     ];

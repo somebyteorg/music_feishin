@@ -1,4 +1,3 @@
-import { openModal } from '@mantine/modals';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -7,11 +6,11 @@ import { isServerLock } from '/@/renderer/features/action-required/utils/window-
 import JellyfinLogo from '/@/renderer/features/servers/assets/jellyfin.png';
 import NavidromeLogo from '/@/renderer/features/servers/assets/navidrome.png';
 import OpenSubsonicLogo from '/@/renderer/features/servers/assets/opensubsonic.png';
-import { ServerList } from '/@/renderer/features/servers/components/server-list';
 import { sharedQueries } from '/@/renderer/features/shared/api/shared-api';
 import { AppRoute } from '/@/renderer/router/routes';
 import { useAuthStoreActions, useCurrentServer, useServerList } from '/@/renderer/store';
 import { hasFeature } from '/@/shared/api/utils';
+import { Button } from '/@/shared/components/button/button';
 import { DropdownMenu } from '/@/shared/components/dropdown-menu/dropdown-menu';
 import { Icon } from '/@/shared/components/icon/icon';
 import { ServerListItemWithCredential, ServerType } from '/@/shared/types/domain-types';
@@ -22,7 +21,7 @@ export const ServerSelectorItems = () => {
     const navigate = useNavigate();
     const currentServer = useCurrentServer();
     const serverList = useServerList();
-    const { setCurrentServer, setMusicFolderId } = useAuthStoreActions();
+    const { deleteServer, setCurrentServer, setMusicFolderId } = useAuthStoreActions();
 
     const { data: musicFolders } = useQuery(
         currentServer
@@ -82,11 +81,9 @@ export const ServerSelectorItems = () => {
         musicFolders?.items.filter((folder) => currentServer.musicFolderId?.includes(folder.id)) ||
         [];
 
-    const handleManageServersModal = () => {
-        openModal({
-            children: <ServerList />,
-            title: t('page.manageServers.title'),
-        });
+    const handleDeleteServer = () => {
+        deleteServer(currentServer.id);
+        navigate(AppRoute.HOME);
     };
 
     return (
@@ -121,12 +118,14 @@ export const ServerSelectorItems = () => {
                 );
             })}
             {!isServerLock() && (
-                <DropdownMenu.Item
-                    leftSection={<Icon icon="edit" />}
-                    onClick={handleManageServersModal}
+                <Button
+                    leftSection={<Icon icon="delete" />}
+                    onClick={handleDeleteServer}
+                    style={{ margin: '10px' }}
+                    variant="state-error"
                 >
-                    {t('page.appMenu.manageServers')}
-                </DropdownMenu.Item>
+                    退出登录
+                </Button>
             )}
             {musicFolders && musicFolders.items.length > 0 && (
                 <>

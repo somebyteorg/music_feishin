@@ -8,12 +8,7 @@ import md5 from 'md5';
 import { z } from 'zod';
 
 import { contract, ssApiClient } from '/@/renderer/api/subsonic/subsonic-api';
-import {
-    getDefaultTranscodingProfiles,
-    getDirectPlayProfiles,
-} from '/@/renderer/features/player/components/audio-players';
 import { randomString } from '/@/renderer/utils';
-import { logFn } from '/@/renderer/utils/logger';
 import { getServerUrl } from '/@/renderer/utils/normalize-server-url';
 import { ssNormalize } from '/@/shared/api/subsonic/subsonic-normalize';
 import {
@@ -61,7 +56,7 @@ const getSubsonicImageRequest = ({
         url:
             `${url}/rest/getCoverArt.view` +
             `?id=${id}` +
-            `&${server.credential}` +
+            `&apiKey=${server.credential}` +
             '&v=1.13.0' +
             '&c=Feishin' +
             (imageSize ? `&size=${imageSize}` : ''),
@@ -1980,79 +1975,10 @@ export const SubsonicController: InternalControllerEndpoint = {
 
         return totalRecordCount;
     },
-    getStreamUrl: async ({ apiClientProps, query }) => {
+    getStreamUrl: async ({ apiClientProps }) => {
         const { server } = apiClientProps;
-        const { bitrate, format, id, mediaType = 'song', skipAutoTranscode, transcode } = query;
 
-        const streamUrl = `${server?.url}/rest/stream.view?id=${id}&v=1.13.0&c=Feishin&${server?.credential}`;
-
-        // If transcoding is explicitly enabled, just return the direct transcoded stream URL
-        if (transcode) {
-            return appendTranscodeParams(streamUrl, format, bitrate);
-        }
-
-        // Used in cases where MPV is the default player, since mpv handles basically every audio format
-        if (skipAutoTranscode) {
-            return streamUrl;
-        }
-
-        // If the server supports transcoding decision, always use it to determine if we need to transcode
-        if (hasFeature(server, ServerFeature.OS_TRANSCODE_DECISION)) {
-            const maxTranscodingAudioBitrate = 0;
-
-            const directPlayProfiles = getDirectPlayProfiles();
-            const transcodingProfiles = getDefaultTranscodingProfiles();
-
-            const transcodeDecision = await ssApiClient(apiClientProps).getTranscodeDecision({
-                body: {
-                    codecProfiles: [],
-                    directPlayProfiles,
-                    maxAudioBitrate: 0,
-                    maxTranscodingAudioBitrate,
-                    name: 'Feishin',
-                    platform: navigator.userAgent,
-                    transcodingProfiles,
-                },
-                query: {
-                    mediaId: id,
-                    mediaType,
-                },
-            });
-
-            // If the server returns an error for transcodeDecision, fall back to direct stream so that we don't break the player
-            if (transcodeDecision.status !== 200) {
-                logFn.error(
-                    `Failed to get transcode decision for song ${id}, falling back to direct stream`,
-                );
-                return streamUrl;
-            }
-
-            const td = transcodeDecision.body.transcodeDecision;
-            const requiresTranscoding = !td?.canDirectPlay;
-
-            // If the server does not require transcoding, just return the direct stream URL
-            if (!requiresTranscoding) {
-                return streamUrl;
-            }
-
-            logFn.info(`Song ${id} requires transcoding: ${[td.transcodeReason].join(', ')}`);
-
-            // If the server does not return transcode params, manually create the transcode params
-            if (!td.transcodeParams) {
-                return appendTranscodeParams(streamUrl, format, bitrate);
-            }
-
-            const transcodeStreamUrl = buildGetTranscodeStreamUrl(server, {
-                mediaId: String(id),
-                mediaType: (mediaType ?? 'song') as 'podcast' | 'song',
-                offset: 0,
-                transcodeParams: td.transcodeParams,
-            });
-
-            return transcodeStreamUrl;
-        }
-
-        return streamUrl;
+        return `${server?.url}/rest/stream.view?id=${id}&v=1.13.0&c=Feishin&apiKey=${server?.credential}`;
     },
     getStructuredLyrics: async (args) => {
         const { apiClientProps, query } = args;

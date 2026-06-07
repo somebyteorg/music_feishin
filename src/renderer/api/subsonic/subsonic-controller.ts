@@ -1981,8 +1981,9 @@ export const SubsonicController: InternalControllerEndpoint = {
 
         return totalRecordCount;
     },
-    getStreamUrl: async ({ apiClientProps }) => {
+    getStreamUrl: async ({ apiClientProps, query }) => {
         const { server } = apiClientProps;
+        const { id } = query;
 
         return `${server?.url}/rest/stream.view?id=${id}&v=1.13.0&c=Feishin&apiKey=${server?.credential}`;
     },

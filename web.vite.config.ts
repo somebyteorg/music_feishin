@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { createReactPlugin } from './vite.react-plugin';
 
 export default defineConfig({
-    base: './',
+    base: '/',
     build: {
         emptyOutDir: true,
         outDir: path.resolve(__dirname, './out/web'),
@@ -136,6 +136,10 @@ export default defineConfig({
                 clientsClaim: true,
                 maximumFileSizeToCacheInBytes: 1000000 * 5, // 5 MB
                 skipWaiting: true,
+                modifyURLPrefix: {
+                    'index.html': '/feishin',
+                    'assets/': '/assets/'
+                },
             },
         }),
     ],

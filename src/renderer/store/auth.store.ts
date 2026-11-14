@@ -1,11 +1,20 @@
-import merge from 'lodash/merge';
 import { nanoid } from 'nanoid/non-secure';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { shallow } from 'zustand/shallow';
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { ServerListItem, ServerListItemWithCredential } from '/@/shared/types/domain-types';
+import { EMOS_SERVER_ID, EMOS_SERVER_NAME, EMOS_SERVER_URL } from '/@/renderer/utils/emos-server';
+import {
+    ServerListItem,
+    ServerListItemWithCredential,
+    ServerType,
+} from '/@/shared/types/domain-types';
+
+const isEmosServer = (server: null | ServerListItemWithCredential | undefined) =>
+    server?.id === EMOS_SERVER_ID &&
+    server.type === ServerType.NAVIDROME &&
+    server.url === EMOS_SERVER_URL;
 
 export interface AuthSlice extends AuthState {
     actions: {
@@ -31,8 +40,9 @@ export const useAuthStore = createWithEqualityFn<AuthSlice>()(
             immer((set, get) => ({
                 actions: {
                     addServer: (args) => {
+                        if (!isEmosServer(args)) return;
                         set((state) => {
-                            state.serverList[args.id] = args;
+                            state.serverList = { [EMOS_SERVER_ID]: args };
                         });
                     },
                     deleteServer: (id) => {
@@ -51,22 +61,12 @@ export const useAuthStore = createWithEqualityFn<AuthSlice>()(
                     },
                     logout: () => {
                         set((state) => {
-                            const currentServer = state.currentServer;
-                            if (!currentServer) {
-                                return;
-                            }
-
-                            const server = state.serverList[currentServer.id];
-                            if (server) {
-                                server.credential = '';
-                                server.ndCredential = undefined;
-                                server.savePassword = false;
-                            }
-
                             state.currentServer = null;
+                            state.serverList = {};
                         });
                     },
                     setCurrentServer: (server) => {
+                        if (server && !isEmosServer(server)) return;
                         set((state) => {
                             state.currentServer = server;
                         });
@@ -83,11 +83,24 @@ export const useAuthStore = createWithEqualityFn<AuthSlice>()(
                         });
                     },
                     updateServer: (id: string, args: Partial<ServerListItemWithCredential>) => {
+                        if (id !== EMOS_SERVER_ID || !get().serverList[id]) return;
                         set((state) => {
                             const updatedServer = {
                                 ...state.serverList[id],
                                 ...args,
+                                id: EMOS_SERVER_ID,
+                                name: EMOS_SERVER_NAME,
+                                preferRemoteUrl: false,
+                                remoteUrl: undefined,
+                                type: ServerType.NAVIDROME,
+                                url: EMOS_SERVER_URL,
                             };
+                            if (updatedServer.ndCredential) {
+                                updatedServer.credential = new URLSearchParams({
+                                    jwt: updatedServer.ndCredential,
+                                    u: updatedServer.username,
+                                }).toString();
+                            }
 
                             if (
                                 state.currentServer?.id === id &&
@@ -108,12 +121,25 @@ export const useAuthStore = createWithEqualityFn<AuthSlice>()(
                 deviceId: nanoid(),
                 serverList: {},
             })),
-            { name: 'store_authentication' },
+            { name: 'emos_feishin_authentication' },
         ),
         {
-            merge: (persistedState, currentState) => merge(currentState, persistedState),
-            name: 'store_authentication',
-            version: 2,
+            merge: (persistedState, currentState) => {
+                const saved = persistedState as Partial<AuthState> | undefined;
+                const server = saved?.currentServer;
+                const currentServer =
+                    isEmosServer(server) && server?.ndCredential && server.credential
+                        ? server
+                        : null;
+                return {
+                    ...currentState,
+                    currentServer,
+                    deviceId: saved?.deviceId || currentState.deviceId,
+                    serverList: currentServer ? { [EMOS_SERVER_ID]: currentServer } : {},
+                };
+            },
+            name: 'emos_feishin_authentication',
+            version: 1,
         },
     ),
 );

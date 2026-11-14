@@ -1,77 +1,26 @@
-import { closeAllModals, openModal } from '@mantine/modals';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import isElectron from 'is-electron';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
 
-import { controller } from '/@/renderer/api/controller';
-import { isServerLock } from '/@/renderer/features/action-required/utils/window-properties';
-import JellyfinLogo from '/@/renderer/features/servers/assets/jellyfin.png';
-import NavidromeLogo from '/@/renderer/features/servers/assets/navidrome.png';
-import OpenSubsonicLogo from '/@/renderer/features/servers/assets/opensubsonic.png';
-import { EditServerForm } from '/@/renderer/features/servers/components/edit-server-form';
-import { ServerList } from '/@/renderer/features/servers/components/server-list';
 import { sharedQueries } from '/@/renderer/features/shared/api/shared-api';
-import { startScanWatch, useScanStatus } from '/@/renderer/features/shared/hooks/use-scan-status';
-import { AppRoute } from '/@/renderer/router/routes';
-import { useAuthStoreActions, useCurrentServer, useServerList } from '/@/renderer/store';
+import { useAuthStoreActions, useCurrentServer } from '/@/renderer/store';
 import { hasFeature } from '/@/shared/api/utils';
 import { DropdownMenu } from '/@/shared/components/dropdown-menu/dropdown-menu';
 import { Icon } from '/@/shared/components/icon/icon';
-import { toast } from '/@/shared/components/toast/toast';
-import {
-    ServerListItem,
-    ServerListItemWithCredential,
-    ServerType,
-} from '/@/shared/types/domain-types';
 import { ServerFeature } from '/@/shared/types/features-types';
 
 const localSettings = isElectron() ? window.api.localSettings : null;
 
 export const ServerSelectorItems = () => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const currentServer = useCurrentServer();
-    const serverList = useServerList();
-    const { logout, setCurrentServer, setMusicFolderId } = useAuthStoreActions();
-    const { isScanning, isWatching } = useScanStatus();
+    const { logout, setMusicFolderId } = useAuthStoreActions();
 
     const { data: musicFolders } = useQuery(
         currentServer
             ? sharedQueries.musicFolders({ query: null, serverId: currentServer.id })
             : { enabled: false, queryKey: ['disabled'] },
     );
-
-    const handleSetCurrentServer = (server: ServerListItemWithCredential) => {
-        navigate(AppRoute.HOME);
-        setCurrentServer(server);
-        setMusicFolderId(undefined);
-    };
-
-    const handleCredentialsModal = async (server: ServerListItem) => {
-        let password: null | string = null;
-
-        try {
-            if (localSettings && server.savePassword) {
-                password = await localSettings.passwordGet(server.id);
-            }
-        } catch (error) {
-            console.error(error);
-        }
-
-        openModal({
-            children: (
-                <EditServerForm
-                    isUpdate
-                    onCancel={closeAllModals}
-                    password={password}
-                    server={server}
-                />
-            ),
-            size: 'sm',
-            title: t('form.updateServer.title'),
-        });
-    };
 
     const supportsMultiSelect = hasFeature(currentServer, ServerFeature.MUSIC_FOLDER_MULTISELECT);
 
@@ -119,13 +68,6 @@ export const ServerSelectorItems = () => {
         musicFolders?.items.filter((folder) => currentServer.musicFolderId?.includes(folder.id)) ||
         [];
 
-    const handleManageServersModal = () => {
-        openModal({
-            children: <ServerList />,
-            title: t('page.manageServers.title'),
-        });
-    };
-
     const handleLogout = async () => {
         const serverId = currentServer.id;
 
@@ -141,87 +83,14 @@ export const ServerSelectorItems = () => {
         }, 0);
     };
 
-    const handleRescanLibrary = async () => {
-        if (!currentServer || isWatching || isScanning) {
-            return;
-        }
-
-        try {
-            await controller.startLibraryScan({
-                apiClientProps: { serverId: currentServer.id },
-            });
-            startScanWatch();
-        } catch (err) {
-            toast.error({
-                message: err instanceof Error ? err.message : String(err),
-            });
-        }
-    };
-
     return (
         <>
-            <DropdownMenu.Label>{t('page.appMenu.selectServer')}</DropdownMenu.Label>
-            {Object.values(serverList).map((server) => {
-                const isNavidromeExpired =
-                    server.type === ServerType.NAVIDROME && !server.ndCredential;
-                const isJellyfinExpired = server.type === ServerType.JELLYFIN && !server.credential;
-                const isSubsonicExpired = server.type === ServerType.SUBSONIC && !server.credential;
-                const isSessionExpired =
-                    isNavidromeExpired || isJellyfinExpired || isSubsonicExpired;
-
-                const logo =
-                    server.type === ServerType.NAVIDROME
-                        ? NavidromeLogo
-                        : server.type === ServerType.JELLYFIN
-                          ? JellyfinLogo
-                          : OpenSubsonicLogo;
-
-                return (
-                    <DropdownMenu.Item
-                        isSelected={currentServer?.id === server.id && !isSessionExpired}
-                        key={`server-${server.id}`}
-                        leftSection={<img src={logo} style={{ height: '1rem', width: '1rem' }} />}
-                        onClick={() => {
-                            if (isSessionExpired) {
-                                handleCredentialsModal(server);
-                            } else {
-                                handleSetCurrentServer(server);
-                            }
-                        }}
-                        rightSection={
-                            isSessionExpired ? <Icon icon="lock" /> : <Icon icon="arrowRight" />
-                        }
-                    >
-                        {server.name}
-                    </DropdownMenu.Item>
-                );
-            })}
-            {!isServerLock() && (
-                <>
-                    <DropdownMenu.Divider />
-                    <DropdownMenu.Item
-                        leftSection={<Icon icon="edit" />}
-                        onClick={handleManageServersModal}
-                    >
-                        {t('page.appMenu.manageServers')}
-                    </DropdownMenu.Item>
-                    {currentServer.isAdmin && (
-                        <DropdownMenu.Item
-                            leftSection={<Icon icon="refresh" />}
-                            onClick={handleRescanLibrary}
-                        >
-                            {t('page.appMenu.rescanLibrary')}
-                        </DropdownMenu.Item>
-                    )}
-                </>
-            )}
             <DropdownMenu.Item
                 leftSection={<Icon color="error" icon="signOut" />}
                 onClick={handleLogout}
             >
                 {t('page.appMenu.logout')}
             </DropdownMenu.Item>
-            {!isServerLock() && <></>}
             {musicFolders && musicFolders.items.length > 0 && (
                 <>
                     <DropdownMenu.Divider />

@@ -39,6 +39,15 @@ export const contract = c.router({
             500: resultWithHeaders(ndType._response.error),
         },
     },
+    authenticateEmos: {
+        body: c.type<{ token: string }>(),
+        method: 'POST',
+        path: 'auth/emos',
+        responses: {
+            200: resultWithHeaders(ndType._response.authenticate),
+            500: resultWithHeaders(ndType._response.error),
+        },
+    },
     createPlaylist: {
         body: ndType._parameters.createPlaylist,
         method: 'POST',
@@ -463,7 +472,7 @@ axiosClient.interceptors.response.use(
 
             if (isAxiosError(error) && error.code === 'ERR_NETWORK') {
                 logger.warn('Network error during authentication - preserving credentials');
-            } else {
+            } else if (currentServer) {
                 limitedFail(currentServer);
             }
         }

@@ -348,6 +348,7 @@ export const AppRouter = () => {
                                     element={<ActionRequiredRoute />}
                                     path={AppRoute.ACTION_REQUIRED}
                                 />
+                                <Route element={<LoginRoute />} path={AppRoute.EMOS_LOGIN} />
                                 <Route element={<LoginRoute />} path={AppRoute.LOGIN} />
                             </Route>
                             <Route element={<ResponsiveLayout />}>

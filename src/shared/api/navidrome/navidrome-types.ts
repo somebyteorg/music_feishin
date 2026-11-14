@@ -371,8 +371,8 @@ const authenticate = z.object({
     id: z.string(),
     isAdmin: z.boolean(),
     name: z.string(),
-    subsonicSalt: z.string(),
-    subsonicToken: z.string(),
+    subsonicSalt: z.string().optional(),
+    subsonicToken: z.string().optional(),
     token: z.string(),
     username: z.string(),
 });

@@ -1219,6 +1219,7 @@
         "year": "年"
     },
     "form": {
+        "emosLogin": "使用 EMOS 快捷登入",
         "addServer": {
             "input_legacyAuthentication": "啟用舊版認證方式",
             "input_name": "伺服器名稱",

@@ -1,0 +1,28 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "emos-music-feishin",
+    "compatibility_date": "2026-11-13",
+    "assets": {
+        "html_handling": "auto-trailing-slash",
+        "not_found_handling": "none",
+        "directory": "./out/web",
+    },
+    "observability": {
+        "logs": {
+            "enabled": false,
+        },
+        "traces": {
+            "enabled": false,
+        },
+    },
+    "routes": [
+        {
+            "pattern": "music.emos.best/feishin*",
+            "zone_name": "emos.best",
+        },
+    ],
+}

@@ -342,6 +342,7 @@
         "startsWith": "Starts with"
     },
     "form": {
+        "emosLogin": "Sign in with EMOS",
         "addServer": {
             "error_savePassword": "An error occurred when trying to save the password",
             "ignoreCors": "Ignore CORS ($t(common.restartRequired))",

@@ -1,5 +1,6 @@
 export enum AppRoute {
     ACTION_REQUIRED = '/action-required',
+    EMOS_LOGIN = '/in',
     EXPLORE = '/explore',
     FAKE_LIBRARY_ALBUM_DETAILS = '/library/albums/dummy/:albumId',
     FAVORITES = '/favorites',

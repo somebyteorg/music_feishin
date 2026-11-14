@@ -4,10 +4,7 @@ import { useEffect } from 'react';
 import { eventEmitter } from '/@/renderer/events/event-emitter';
 import { UserFavoriteEventPayload, UserRatingEventPayload } from '/@/renderer/events/events';
 import { DiscordRpcHook } from '/@/renderer/features/discord-rpc/use-discord-rpc';
-import { DlnaPlayer } from '/@/renderer/features/player/audio-player/dlna-player';
 import { MainPlayerListenerHook } from '/@/renderer/features/player/audio-player/hooks/use-main-player-listener';
-import { JukeboxPlayer } from '/@/renderer/features/player/audio-player/jukebox-player';
-import { MpvPlayer } from '/@/renderer/features/player/audio-player/mpv-player';
 import { WebPlayer } from '/@/renderer/features/player/audio-player/web-player';
 import { SleepTimerHook } from '/@/renderer/features/player/components/sleep-timer-button';
 import { AutoDJHook } from '/@/renderer/features/player/hooks/use-auto-dj';
@@ -24,7 +21,6 @@ import { ResumePositionHook } from '/@/renderer/features/player/hooks/use-resume
 import { ScrobbleHook } from '/@/renderer/features/player/hooks/use-scrobble';
 import { UpdateCurrentSongHook } from '/@/renderer/features/player/hooks/use-update-current-song';
 import { useWebAudio } from '/@/renderer/features/player/hooks/use-webaudio';
-import { RadioDlnaPlayer } from '/@/renderer/features/radio/components/radio-dlna-player';
 import { RadioWebPlayer } from '/@/renderer/features/radio/components/radio-web-player';
 import {
     RadioAudioInstanceHook,
@@ -36,7 +32,6 @@ import { RemoteLibraryHook } from '/@/renderer/features/remote/hooks/use-remote-
 import { RemoteQueuePushHook } from '/@/renderer/features/remote/hooks/use-remote-queue-push';
 import { RemoteRadioPushHook } from '/@/renderer/features/remote/hooks/use-remote-radio-push';
 import { RemoteSettingsPushHook } from '/@/renderer/features/remote/hooks/use-remote-settings-push';
-import { ComponentErrorBoundary } from '/@/renderer/features/shared/components/component-error-boundary';
 import { VisualizerSystemAudioBridgeHook } from '/@/renderer/features/visualizer/components/visualizer-system-audio-bridge';
 import { useSettingsStore } from '/@/renderer/store';
 import {
@@ -372,29 +367,5 @@ const AudioPlayersContent = ({
         };
     }, [serverId]);
 
-    if (playbackType === PlayerType.LOCAL) {
-        return <MpvPlayer />;
-    }
-
-    if (playbackType === PlayerType.WEB) {
-        if (isRadioActive) {
-            return <RadioWebPlayer />;
-        }
-
-        return <WebPlayer />;
-    }
-
-    if (playbackType === PlayerType.DLNA) {
-        return (
-            <ComponentErrorBoundary>
-                {isRadioActive ? <RadioDlnaPlayer /> : <DlnaPlayer />}
-            </ComponentErrorBoundary>
-        );
-    }
-
-    if (playbackType === PlayerType.JUKEBOX) {
-        return <JukeboxPlayer />;
-    }
-
-    return null;
+    return isRadioActive ? <RadioWebPlayer /> : <WebPlayer />;
 };

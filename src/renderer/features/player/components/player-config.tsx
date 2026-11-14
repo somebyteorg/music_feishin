@@ -1,19 +1,11 @@
-import isElectron from 'is-electron';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { eventEmitter } from '/@/renderer/events/event-emitter';
-import { usePlayer } from '/@/renderer/features/player/context/player-context';
-import {
-    getDefaultAudioDevice,
-    useAudioDevices,
-} from '/@/renderer/features/settings/components/playback/audio-settings';
 import {
     ListConfigBooleanControl,
     ListConfigTable,
 } from '/@/renderer/features/shared/components/list-config-menu';
 import {
-    usePlaybackType,
     usePlayerActions,
     usePlayerProperties,
     usePlayerSongProperties,
@@ -42,8 +34,6 @@ import { Stack } from '/@/shared/components/stack/stack';
 import { Text } from '/@/shared/components/text/text';
 import { CrossfadeStyle, PlayerStatus, PlayerStyle, PlayerType } from '/@/shared/types/types';
 
-const ipc = isElectron() ? window.api.ipc : null;
-
 export const PlayerConfig = () => {
     const { t } = useTranslation();
     const preservePitch = useSettingsStore((state) => state.playback.preservePitch);
@@ -63,22 +53,6 @@ export const PlayerConfig = () => {
             });
         },
         [playbackSettings, setSettings],
-    );
-
-    const audioOptions = useMemo(
-        () => [
-            {
-                component: <AudioPlayerTypeConfig />,
-                id: 'audioPlayerType',
-                label: t('setting.audioPlayer'),
-            },
-            {
-                component: <AudioDeviceConfig />,
-                id: 'audioDevice',
-                label: t('setting.audioDevice'),
-            },
-        ],
-        [t],
     );
 
     const transitionOptions = useMemo(
@@ -225,9 +199,6 @@ export const PlayerConfig = () => {
             <Popover.Dropdown maw={720} miw={540} onClick={(e) => e.stopPropagation()} p="sm">
                 <Stack gap="sm">
                     <Paper p="md" radius="md">
-                        <ListConfigTable options={audioOptions} />
-                    </Paper>
-                    <Paper p="md" radius="md">
                         <ListConfigTable options={transitionOptions} />
                     </Paper>
                     <Paper p="md" radius="md">
@@ -239,98 +210,6 @@ export const PlayerConfig = () => {
                 </Stack>
             </Popover.Dropdown>
         </Popover>
-    );
-};
-
-const AudioPlayerTypeConfig = () => {
-    const { t } = useTranslation();
-    const status = usePlayerStatus();
-    const playbackSettings = usePlaybackSettings();
-    const { setSettings } = useSettingsStoreActions();
-    const { mediaStop } = usePlayer();
-
-    const showRefreshButton = playbackSettings.type === PlayerType.LOCAL;
-
-    const isCasting = playbackSettings.type === PlayerType.DLNA;
-
-    return (
-        <Group gap="xs" wrap="nowrap">
-            <Select
-                comboboxProps={{ withinPortal: false }}
-                data={[
-                    {
-                        disabled: !isElectron(),
-                        label: 'MPV',
-                        value: PlayerType.LOCAL,
-                    },
-                    { label: 'Web', value: PlayerType.WEB },
-                    { label: 'Jukebox', value: PlayerType.JUKEBOX },
-                    ...(isCasting
-                        ? [{ disabled: true, label: 'DLNA', value: PlayerType.DLNA }]
-                        : []),
-                ]}
-                defaultValue={playbackSettings.type}
-                disabled={status === PlayerStatus.PLAYING || isCasting}
-                onChange={(e) => {
-                    setSettings({
-                        playback: { ...playbackSettings, type: e as PlayerType },
-                    });
-                    ipc?.send('settings-set', {
-                        property: 'playbackType',
-                        value: e,
-                    });
-                }}
-                variant="filled"
-                width="100%"
-            />
-            {showRefreshButton && (
-                <ActionIcon
-                    icon="refresh"
-                    iconProps={{ size: 'md' }}
-                    onClick={() => {
-                        mediaStop();
-                        eventEmitter.emit('MPV_RELOAD', {});
-                    }}
-                    tooltip={{ label: t('common.reload') }}
-                    variant="transparent"
-                />
-            )}
-        </Group>
-    );
-};
-
-const AudioDeviceConfig = () => {
-    const status = usePlayerStatus();
-    const playbackType = usePlaybackType();
-    const playbackSettings = usePlaybackSettings();
-    const { setSettings } = useSettingsStoreActions();
-
-    const audioDevices = useAudioDevices(playbackType);
-    const audioDeviceId =
-        playbackType === PlayerType.LOCAL
-            ? playbackSettings.mpvAudioDeviceId
-            : playbackSettings.audioDeviceId;
-
-    return (
-        <Select
-            comboboxProps={{ withinPortal: false }}
-            data={audioDevices}
-            disabled={status === PlayerStatus.PLAYING}
-            key={playbackType}
-            onChange={(e) => {
-                setSettings({
-                    playback: {
-                        ...playbackSettings,
-                        ...(playbackType === PlayerType.LOCAL
-                            ? { mpvAudioDeviceId: e }
-                            : { audioDeviceId: e }),
-                    },
-                });
-            }}
-            value={audioDeviceId ?? getDefaultAudioDevice(audioDevices, playbackType)}
-            variant="filled"
-            width="100%"
-        />
     );
 };
 

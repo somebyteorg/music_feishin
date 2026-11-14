@@ -1480,22 +1480,6 @@ export const SubsonicController: InternalControllerEndpoint = {
         if (subsonicFeatures[SubsonicExtensions.TOP_SONGS_BY_ARTIST_ID]) {
             features.topSongsByArtistId = [1];
         }
-        try {
-            const jukeboxStatus = await ssApiClient(apiClientProps).jukeboxControl({
-                query: { action: 'status' },
-            });
-
-            if (jukeboxStatus.status === 200 && !(jukeboxStatus.body as any)?.error) {
-                features[ServerFeature.JUKEBOX] = [1];
-            } else {
-                logger.warn(
-                    'Jukebox endpoint returned an error payload:',
-                    (jukeboxStatus.body as any)?.error,
-                );
-            }
-        } catch (error) {
-            logger.warn('Jukebox is not supported by this server:', error);
-        }
 
         return { features, id: apiClientProps.server?.id, version: ping.body.serverVersion };
     },

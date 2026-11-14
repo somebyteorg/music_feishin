@@ -11,19 +11,12 @@ import { LibraryItem } from '/@/shared/types/domain-types';
 
 interface HomeCommandsProps {
     handleClose: () => void;
-    pages: CommandPalettePages[];
     query: string;
     setPages: Dispatch<CommandPalettePages[]>;
     setQuery: Dispatch<string>;
 }
 
-export const HomeCommands = ({
-    handleClose,
-    pages,
-    query,
-    setPages,
-    setQuery,
-}: HomeCommandsProps) => {
+export const HomeCommands = ({ handleClose, query, setPages, setQuery }: HomeCommandsProps) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const server = useCurrentServer();
@@ -62,14 +55,10 @@ export const HomeCommands = ({
                 <Command.Item onSelect={handleCreatePlaylistModal}>
                     {t('action.createPlaylist')}...
                 </Command.Item>
-                <Command.Item onSelect={() => setPages([...pages, CommandPalettePages.GO_TO])}>
-                    {t('page.globalSearch.commands.goToPage')}...
-                </Command.Item>
                 <Command.Item
-                    onSelect={() => setPages([...pages, CommandPalettePages.MANAGE_SERVERS])}
+                    onSelect={() => setPages([CommandPalettePages.HOME, CommandPalettePages.GO_TO])}
                 >
-                    {t('page.globalSearch.commands.serverCommands')}
-                    ...
+                    {t('page.globalSearch.commands.goToPage')}...
                 </Command.Item>
             </Command.Group>
         </>

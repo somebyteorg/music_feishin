@@ -2,6 +2,7 @@ import isElectron from 'is-electron';
 
 import i18n from '/@/i18n/i18n';
 import { useAuthStore } from '/@/renderer/store';
+import { logger } from '/@/renderer/utils/logger';
 import { toast } from '/@/shared/components/toast/toast';
 import { ServerListItem } from '/@/shared/types/types';
 
@@ -22,9 +23,7 @@ export const authenticationFailure = (currentServer: null | ServerListItem, mess
         return;
     }
 
-    console.error(
-        `token is expired: ${currentServer?.ndCredential ?? store.currentServer?.ndCredential}`,
-    );
+    logger.warn('Session expired', { serverId });
     localSettings?.passwordRemove(serverId);
 
     // logout() clears credentials on the server list entry and sets currentServer to null.

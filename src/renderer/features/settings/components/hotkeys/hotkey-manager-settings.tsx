@@ -215,7 +215,9 @@ export const HotkeyManagerSettings = memo(() => {
     }, [bindings]);
 
     const filteredBindings = useMemo(() => {
-        const base = Object.keys(bindings);
+        const base = Object.keys(bindings).filter(
+            (binding) => binding !== 'zoomIn' && binding !== 'zoomOut',
+        );
 
         if (keyword === '') {
             return base.filter((binding) => BINDINGS_MAP[binding as keyof typeof BINDINGS_MAP]);

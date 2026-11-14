@@ -499,15 +499,11 @@ export const ssApiClient = (args: {
             if (server) {
                 const serverUrl = getServerUrl(server, forceRemoteUrl);
                 baseUrl = serverUrl ? `${serverUrl}/rest` : undefined;
-                const token = server.credential;
-                const params = token.split(/&?\w=/gm);
-
-                authParams.u = decodeURIComponent(server.username);
-                if (params?.length === 4) {
-                    authParams.s = params[2];
-                    authParams.t = params[3];
-                } else if (params?.length === 3) {
-                    authParams.p = decodeURIComponent(params[2]);
+                const credential = new URLSearchParams(server.credential);
+                authParams.u = server.username;
+                for (const key of ['jwt', 'p', 's', 't']) {
+                    const value = credential.get(key);
+                    if (value !== null) authParams[key] = value;
                 }
             } else {
                 baseUrl = url;

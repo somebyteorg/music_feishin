@@ -28,6 +28,8 @@ export const SettingsSection = ({ extra, options, title }: SettingsSectionProps)
         (o) => !o.isHidden && (!hasKeyword || o.title.toLocaleLowerCase().includes(keyword)),
     );
 
+    if (values.length === 0 && !extra) return null;
+
     return (
         <>
             {title && (

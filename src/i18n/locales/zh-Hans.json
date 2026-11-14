@@ -1019,6 +1019,7 @@
         }
     },
     "form": {
+        "emosLogin": "使用 EMOS 快捷登录",
         "deletePlaylist": {
             "title": "删除$t(entity.playlist, {\"count\": 1})",
             "success": "$t(entity.playlist, {\"count\": 1})已成功删除",

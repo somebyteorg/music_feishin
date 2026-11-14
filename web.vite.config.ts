@@ -7,10 +7,10 @@ import { kuromojiDictionaryPlugin } from './vite.kuromoji-plugin';
 import { createReactPlugin } from './vite.react-plugin';
 
 export default defineConfig({
-    base: './',
+    base: '/feishin/',
     build: {
         emptyOutDir: true,
-        outDir: path.resolve(__dirname, './out/web'),
+        outDir: path.resolve(__dirname, './out/web/feishin'),
         rollupOptions: {
             input: {
                 '32x32': normalizePath(path.resolve(__dirname, './assets/icons/32x32.png')),
@@ -47,7 +47,7 @@ export default defineConfig({
                 sourcemapExcludeSources: false,
             },
         },
-        sourcemap: true,
+        sourcemap: false,
     },
     css: {
         modules: {
@@ -76,7 +76,7 @@ export default defineConfig({
                 // The PWA will not be shown during development
                 enabled: false,
             },
-            filename: 'assets/sw.js',
+            filename: 'sw.js',
             injectRegister: 'inline',
             manifest: {
                 background_color: '#FFDCB5',
@@ -114,8 +114,10 @@ export default defineConfig({
                         type: 'image/png',
                     },
                 ],
-                name: 'Feishin',
+                id: '/feishin/',
+                name: '跃律',
                 orientation: 'portrait',
+                scope: '/feishin/',
                 screenshots: [
                     {
                         form_factor: 'wide',
@@ -125,19 +127,21 @@ export default defineConfig({
                         type: 'image/webp',
                     },
                 ],
-                short_name: 'Feishin',
-                start_url: '/',
+                short_name: '跃律',
+                start_url: '/feishin/',
                 theme_color: '#1E003D',
             },
             manifestFilename: 'assets/manifest.webmanifest',
-            outDir: path.resolve(__dirname, './out/web/'),
+            outDir: path.resolve(__dirname, './out/web/feishin/'),
             registerType: 'autoUpdate',
-            scope: '/assets/',
+            scope: '/feishin/',
             workbox: {
                 cleanupOutdatedCaches: true,
                 clientsClaim: true,
                 globIgnores: ['**/kuromoji/**'],
                 maximumFileSizeToCacheInBytes: 1000000 * 10, // 10 MB
+                navigateFallback: '/feishin/index.html',
+                navigateFallbackAllowlist: [/^\/feishin\//],
                 skipWaiting: true,
             },
         }),

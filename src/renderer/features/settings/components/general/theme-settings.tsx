@@ -109,6 +109,8 @@ const CustomThemesManager = memo(() => {
     const erroredThemes = customThemes.filter((theme) => theme.error);
     const warnedThemes = customThemes.filter((theme) => !theme.error && theme.warnings?.length);
 
+    if (!isElectron()) return null;
+
     return (
         <>
             <SettingsOptions

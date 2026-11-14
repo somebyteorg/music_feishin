@@ -1,301 +1,94 @@
-import isElectron from 'is-electron';
-import { nanoid } from 'nanoid/non-secure';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 
 import { api } from '/@/renderer/api';
 import { PageHeader } from '/@/renderer/components/page-header/page-header';
-import {
-    findExistingServerLockServer,
-    normalizeServerUrl,
-} from '/@/renderer/features/action-required/utils/server-lock';
-import {
-    isLegacyAuth,
-    isServerLock,
-} from '/@/renderer/features/action-required/utils/window-properties';
-import JellyfinIcon from '/@/renderer/features/servers/assets/jellyfin.png';
 import NavidromeIcon from '/@/renderer/features/servers/assets/navidrome.png';
-import SubsonicIcon from '/@/renderer/features/servers/assets/opensubsonic.png';
-import { IgnoreCorsSslSwitches } from '/@/renderer/features/servers/components/ignore-cors-ssl-switches';
-import { JellyfinQuickConnectButton } from '/@/renderer/features/servers/components/jellyfin-quick-connect-button';
-import {
-    JellyfinSignInMethod,
-    JellyfinSignInMethodPicker,
-} from '/@/renderer/features/servers/components/jellyfin-sign-in-method-picker';
-import { useJellyfinQuickConnect } from '/@/renderer/features/servers/hooks/use-jellyfin-quick-connect';
 import { AnimatedPage } from '/@/renderer/features/shared/components/animated-page';
 import { PageErrorBoundary } from '/@/renderer/features/shared/components/page-error-boundary';
+import { queryClient } from '/@/renderer/lib/react-query';
 import { AppRoute } from '/@/renderer/router/routes';
+import { useAuthStore, useCurrentServer } from '/@/renderer/store';
 import {
-    getServerById,
-    useAuthStore,
-    useAuthStoreActions,
-    useCurrentServer,
-    useServerList,
-} from '/@/renderer/store';
+    EMOS_LOGIN_URL,
+    EMOS_SERVER_ID,
+    EMOS_SERVER_NAME,
+    EMOS_SERVER_URL,
+} from '/@/renderer/utils/emos-server';
 import { Button } from '/@/shared/components/button/button';
 import { Center } from '/@/shared/components/center/center';
-import { Code } from '/@/shared/components/code/code';
 import { Paper } from '/@/shared/components/paper/paper';
 import { PasswordInput } from '/@/shared/components/password-input/password-input';
 import { Stack } from '/@/shared/components/stack/stack';
 import { TextInput } from '/@/shared/components/text-input/text-input';
-import { TextTitle } from '/@/shared/components/text-title/text-title';
 import { Text } from '/@/shared/components/text/text';
-import { toast } from '/@/shared/components/toast/toast';
 import { useForm } from '/@/shared/hooks/use-form';
-import { AuthenticationResponse, ServerListItemWithCredential } from '/@/shared/types/domain-types';
-import { ServerType, toServerType } from '/@/shared/types/types';
+import { ServerType } from '/@/shared/types/domain-types';
 
-const localSettings = isElectron() ? window.api.localSettings : null;
-
-const SERVER_ICONS: Record<ServerType, string> = {
-    [ServerType.JELLYFIN]: JellyfinIcon,
-    [ServerType.NAVIDROME]: NavidromeIcon,
-    [ServerType.SUBSONIC]: SubsonicIcon,
-};
-
-const SERVER_NAMES: Record<ServerType, string> = {
-    [ServerType.JELLYFIN]: 'Jellyfin',
-    [ServerType.NAVIDROME]: 'Navidrome',
-    [ServerType.SUBSONIC]: 'OpenSubsonic',
+const signIn = async (body: Record<string, string>) => {
+    await queryClient.cancelQueries();
+    useAuthStore.getState().actions.logout();
+    queryClient.clear();
+    const data = await api.controller.authenticate(EMOS_SERVER_URL, body, ServerType.NAVIDROME);
+    const server = {
+        ...data,
+        id: EMOS_SERVER_ID,
+        name: EMOS_SERVER_NAME,
+        type: ServerType.NAVIDROME,
+        url: EMOS_SERVER_URL,
+    };
+    const { addServer, setCurrentServer } = useAuthStore.getState().actions;
+    addServer(server);
+    setCurrentServer(server);
 };
 
 const LoginRoute = () => {
     const { t } = useTranslation();
-    const [isLoading, setIsLoading] = useState(false);
-    const { addServer, deleteServer, setCurrentServer, updateServer } = useAuthStoreActions();
+    const { pathname, search } = useLocation();
+    const navigate = useNavigate();
+    const isEmosCallback = pathname === AppRoute.EMOS_LOGIN;
+    const callbackToken = isEmosCallback ? (new URLSearchParams(search).get('token') ?? '') : null;
+    const [isLoading, setIsLoading] = useState(isEmosCallback);
+    const [error, setError] = useState('');
+    const startedCallbackToken = useRef<null | string>(null);
     const currentServer = useCurrentServer();
-    const serverList = useServerList();
-
-    // Check if server lock is configured
-    const serverLock = isServerLock();
-    const serverType = window.SERVER_TYPE ? toServerType(window.SERVER_TYPE) : null;
-    const serverName = window.SERVER_NAME || '';
-    const serverUrl = window.SERVER_URL || '';
-    const remoteUrl = window.REMOTE_URL || '';
-    const legacyAuth = serverLock && isLegacyAuth();
-
-    const config = [
-        {
-            isValid: true,
-            key: 'SERVER_LOCK',
-            value: serverLock,
-        },
-        {
-            isValid: serverType !== null,
-            key: 'SERVER_TYPE',
-            value: serverType,
-        },
-        {
-            isValid: true,
-            key: 'SERVER_NAME',
-            value: serverName,
-        },
-        {
-            isValid: serverUrl !== '',
-            key: 'SERVER_URL',
-            value: serverUrl,
-        },
-        {
-            isValid: true,
-            key: 'REMOTE_URL',
-            value: remoteUrl,
-        },
-    ];
-
-    const form = useForm({
-        initialValues: {
-            password: '',
-            username: '',
-        },
-    });
-
-    const [signInMethod, setSignInMethod] = useState<JellyfinSignInMethod>('password');
-    const showQuickConnect = serverType === ServerType.JELLYFIN && signInMethod === 'quickConnect';
-
-    const {
-        code: quickConnectCode,
-        isLoading: isQuickConnectLoading,
-        start: startQuickConnect,
-        stop: stopQuickConnect,
-    } = useJellyfinQuickConnect({
-        onAuthenticated: (data) => {
-            const normalizedUrl = normalizeServerUrl(serverUrl);
-            const normalizedRemoteURL = normalizeServerUrl(remoteUrl);
-            const existingServer = serverLock
-                ? findExistingServerLockServer(serverList, normalizedUrl, serverType)
-                : undefined;
-
-            const serverId = existingServer?.id ?? nanoid();
-            const serverItem: ServerListItemWithCredential = {
-                credential: data.credential,
-                id: serverId,
-                isAdmin: data.isAdmin,
-                name: serverName,
-                remoteUrl: normalizedRemoteURL,
-                type: serverType as ServerType,
-                url: normalizedUrl,
-                userId: data.userId,
-                username: data.username,
-            };
-
-            if (existingServer) {
-                updateServer(existingServer.id, {
-                    credential: data.credential,
-                    isAdmin: data.isAdmin,
-                    name: serverName,
-                    remoteUrl: normalizedRemoteURL,
-                    url: normalizedUrl,
-                    userId: data.userId,
-                    username: data.username,
-                });
-                const updated = getServerById(existingServer.id);
-                if (updated) setCurrentServer(updated);
-            } else {
-                addServer(serverItem);
-                setCurrentServer(serverItem);
-            }
-
-            if (serverLock) {
-                Object.values(useAuthStore.getState().serverList).forEach((server) => {
-                    if (server.id !== serverId) deleteServer(server.id);
-                });
-            }
-
-            toast.success({ message: t('form.addServer.success') });
-        },
-    });
+    const form = useForm({ initialValues: { password: '', username: '' } });
 
     useEffect(() => {
-        if (!showQuickConnect) stopQuickConnect();
-    }, [showQuickConnect, stopQuickConnect]);
+        if (callbackToken === null || startedCallbackToken.current === callbackToken) return;
+        startedCallbackToken.current = callbackToken;
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${window.location.pathname}${window.location.search}#${AppRoute.EMOS_LOGIN}`,
+        );
+        setIsLoading(true);
+        setError('');
+        signIn({ action: 'emos', token: callbackToken })
+            .then(() => navigate(AppRoute.HOME, { replace: true }))
+            .catch((err: unknown) => {
+                setError(err instanceof Error ? err.message : t('error.authenticationFailed'));
+            })
+            .finally(() => setIsLoading(false));
+    }, [callbackToken, navigate, t]);
 
-    // If server lock is not enabled, or we already have a server, redirect to home
-    if (currentServer) {
+    if (currentServer && !isEmosCallback && !isLoading) {
         return <Navigate replace to={AppRoute.HOME} />;
     }
 
-    // If any of the config values are invalid, show error
-    if (config.some((c) => !c.isValid)) {
-        return (
-            <AnimatedPage>
-                <PageHeader />
-                <Center style={{ height: '100%', width: '100vw' }}>
-                    <Stack>
-                        <TextTitle fw={600}>{t('error.genericError')}</TextTitle>
-                        <Text fw={500}>{t('error.serverNotSelectedError')}</Text>
-                        <Code block>{JSON.stringify(config, null, 2)}</Code>
-                    </Stack>
-                </Center>
-            </AnimatedPage>
-        );
-    }
-
     const handleSubmit = form.onSubmit(async (values) => {
-        const authFunction = api.controller.authenticate;
-
-        if (!authFunction) {
-            return toast.error({
-                message: t('error.invalidServer'),
-            });
-        }
-
+        setIsLoading(true);
+        setError('');
         try {
-            setIsLoading(true);
-            const data: AuthenticationResponse | undefined = await authFunction(
-                serverUrl,
-                {
-                    legacy: legacyAuth,
-                    password: values.password,
-                    username: values.username,
-                },
-                serverType as ServerType,
-            );
-
-            if (!data) {
-                return toast.error({
-                    message: t('error.authenticationFailed'),
-                });
-            }
-
-            const normalizedUrl = normalizeServerUrl(serverUrl);
-            const normalizedRemoteURL = normalizeServerUrl(remoteUrl);
-            const existingServer = serverLock
-                ? findExistingServerLockServer(serverList, normalizedUrl, serverType)
-                : undefined;
-
-            const serverId = existingServer?.id ?? nanoid();
-            const serverItem: ServerListItemWithCredential = {
-                credential: data.credential,
-                id: serverId,
-                isAdmin: data.isAdmin,
-                name: serverName,
-                remoteUrl: normalizedRemoteURL,
-                type: serverType as ServerType,
-                url: normalizedUrl,
-                userId: data.userId,
-                username: data.username,
-            };
-
-            if (existingServer) {
-                const updates: Partial<ServerListItemWithCredential> = {
-                    credential: data.credential,
-                    isAdmin: data.isAdmin,
-                    name: serverName,
-                    remoteUrl: normalizedRemoteURL,
-                    url: normalizedUrl,
-                    userId: data.userId,
-                    username: data.username,
-                };
-                if (data.ndCredential !== undefined) {
-                    updates.ndCredential = data.ndCredential;
-                }
-                updateServer(existingServer.id, updates);
-                const updated = getServerById(existingServer.id);
-                if (updated) setCurrentServer(updated);
-            } else {
-                if (data.ndCredential !== undefined) {
-                    serverItem.ndCredential = data.ndCredential;
-                }
-                addServer(serverItem);
-                setCurrentServer(serverItem);
-            }
-
-            if (serverLock) {
-                Object.values(useAuthStore.getState().serverList).forEach((server) => {
-                    if (server.id !== serverId) {
-                        deleteServer(server.id);
-                    }
-                });
-            }
-
-            toast.success({
-                message: t('form.addServer.success'),
-            });
-
-            if (localSettings && values.password) {
-                const saved = await localSettings.passwordSet(values.password, serverId);
-                if (!saved) {
-                    toast.error({
-                        message: t('form.addServer.error', {
-                            context: 'savePassword',
-                        }),
-                    });
-                }
-            }
-        } catch (err: any) {
+            await signIn(values);
+            navigate(AppRoute.HOME, { replace: true });
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t('error.authenticationFailed'));
+        } finally {
             setIsLoading(false);
-            return toast.error({ message: err?.message });
         }
-
-        return setIsLoading(false);
     });
-
-    const isSubmitDisabled = !showQuickConnect && (!form.values.username || !form.values.password);
-    const serverIcon = SERVER_ICONS[serverType as ServerType];
-    const serverDisplayName = SERVER_NAMES[serverType as ServerType];
 
     return (
         <AnimatedPage>
@@ -305,78 +98,50 @@ const LoginRoute = () => {
                     <form onSubmit={handleSubmit}>
                         <Stack gap="xl">
                             <Stack align="center" gap="md">
-                                <img
-                                    alt={serverDisplayName}
-                                    height="80"
-                                    src={serverIcon}
-                                    width="80"
-                                />
+                                <img alt="Navidrome" height="80" src={NavidromeIcon} width="80" />
                                 <Text fw={600} size="xl">
-                                    {serverName}
+                                    {EMOS_SERVER_NAME}
                                 </Text>
-                                {serverName && (
-                                    <Text c="dimmed" size="sm">
-                                        {serverDisplayName}
-                                    </Text>
-                                )}
                             </Stack>
-
+                            {error && (
+                                <Text c="red" role="alert">
+                                    {error}
+                                </Text>
+                            )}
+                            <Button
+                                fullWidth
+                                loading={isLoading}
+                                onClick={() => window.location.assign(EMOS_LOGIN_URL)}
+                                variant="filled"
+                            >
+                                {t('form.emosLogin')}
+                            </Button>
                             <Stack gap="md">
-                                <IgnoreCorsSslSwitches />
-                                {serverType === ServerType.JELLYFIN && (
-                                    <JellyfinSignInMethodPicker
-                                        onChange={(method) => {
-                                            setSignInMethod(method);
-                                            if (method !== 'quickConnect') stopQuickConnect();
-                                        }}
-                                        value={signInMethod}
-                                    />
-                                )}
-                                {!showQuickConnect && (
-                                    <>
-                                        <TextInput
-                                            data-autofocus
-                                            label={t('form.addServer.input', {
-                                                context: 'username',
-                                            })}
-                                            required
-                                            variant="filled"
-                                            {...form.getInputProps('username')}
-                                        />
-                                        <PasswordInput
-                                            label={t('form.addServer.input', {
-                                                context: 'password',
-                                            })}
-                                            required
-                                            variant="filled"
-                                            {...form.getInputProps('password')}
-                                        />
-                                    </>
-                                )}
-                            </Stack>
-
-                            {!showQuickConnect && (
-                                <Button
-                                    disabled={isSubmitDisabled}
-                                    fullWidth
-                                    loading={isLoading}
-                                    type="submit"
+                                <TextInput
+                                    autoComplete="username"
+                                    disabled={isLoading}
+                                    label={t('form.addServer.input', { context: 'username' })}
+                                    required
                                     variant="filled"
-                                >
-                                    {t('common.login', {
-                                        defaultValue: 'Login',
-                                    })}
-                                </Button>
-                            )}
-                            {showQuickConnect && (
-                                <JellyfinQuickConnectButton
-                                    code={quickConnectCode}
-                                    isLoading={isQuickConnectLoading}
-                                    onStart={() => startQuickConnect(serverUrl)}
-                                    onStop={stopQuickConnect}
-                                    url={serverUrl}
+                                    {...form.getInputProps('username')}
                                 />
-                            )}
+                                <PasswordInput
+                                    autoComplete="current-password"
+                                    disabled={isLoading}
+                                    label={t('form.addServer.input', { context: 'password' })}
+                                    required
+                                    variant="filled"
+                                    {...form.getInputProps('password')}
+                                />
+                            </Stack>
+                            <Button
+                                disabled={!form.values.username || !form.values.password}
+                                fullWidth
+                                loading={isLoading}
+                                type="submit"
+                            >
+                                {t('common.login', { defaultValue: 'Login' })}
+                            </Button>
                         </Stack>
                     </form>
                 </Paper>
@@ -385,12 +150,10 @@ const LoginRoute = () => {
     );
 };
 
-const LoginRouteWithBoundary = () => {
-    return (
-        <PageErrorBoundary>
-            <LoginRoute />
-        </PageErrorBoundary>
-    );
-};
+const LoginRouteWithBoundary = () => (
+    <PageErrorBoundary>
+        <LoginRoute />
+    </PageErrorBoundary>
+);
 
 export default LoginRouteWithBoundary;

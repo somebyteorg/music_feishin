@@ -1355,7 +1355,7 @@ const initialState: SettingsState = {
         confirmQueueChanges: true,
         disabledContextMenu: {},
         enableGridMultiSelect: false,
-        externalLinks: true,
+        externalLinks: false,
         followCurrentSong: true,
         followSystemTheme: false,
         fullscreenAutoOpenTimeout: 0,
@@ -1371,7 +1371,7 @@ const initialState: SettingsState = {
             sidebar: 400,
             table: 80,
         },
-        language: 'en',
+        language: 'zh-Hans',
         lastFM: true,
         lastfmApiKey: '',
         listenBrainz: true,
@@ -1406,7 +1406,7 @@ const initialState: SettingsState = {
         showFavorites: true,
         showLyricsInSidebar: true,
         showQueueInSidebar: true,
-        showRatings: true,
+        showRatings: false,
         showVisualizerInSidebar: true,
         sidebarCollapsedNavigation: true,
         sidebarCollapseShared: false,
@@ -2276,6 +2276,16 @@ const initialState: SettingsState = {
     },
 };
 
+const normalizeWebSettings = (settings: SettingsState) => {
+    settings.playback.type = PlayerType.WEB;
+    settings.playback.previousPlayerType = undefined;
+    settings.window.windowBarStyle = Platform.WEB;
+    for (const binding of Object.values(settings.hotkeys.bindings)) {
+        binding.isGlobal = false;
+    }
+    if (settings.tab === 'window') settings.tab = 'general';
+};
+
 const initialStateWithEnv = mergeWith(
     cloneDeep(initialState),
     getEnvSettingsOverrides(),
@@ -2389,6 +2399,7 @@ export const useSettingsStore = createWithEqualityFn<SettingsSlice>()(
                         setSettings: (data) => {
                             set((state) => {
                                 deepMergeIntoState(state, data);
+                                normalizeWebSettings(state);
                             });
                         },
                         setSidebarItems: (items: SidebarItemType[]) => {
@@ -2438,7 +2449,11 @@ export const useSettingsStore = createWithEqualityFn<SettingsSlice>()(
             { name: 'store_settings' },
         ),
         {
-            merge: mergeOverridingColumns,
+            merge: (persistedState, currentState) => {
+                const state = mergeOverridingColumns(persistedState, currentState);
+                normalizeWebSettings(state);
+                return state;
+            },
             migrate(persistedState, version) {
                 const state = persistedState as SettingsSlice;
 

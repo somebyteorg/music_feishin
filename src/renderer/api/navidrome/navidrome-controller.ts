@@ -6,7 +6,7 @@ import { ndApiClient } from '/@/renderer/api/navidrome/navidrome-api';
 import { ssApiClient } from '/@/renderer/api/subsonic/subsonic-api';
 import { SubsonicController } from '/@/renderer/api/subsonic/subsonic-controller';
 import { ndNormalize } from '/@/shared/api/navidrome/navidrome-normalize';
-import { NDRadioListSort, NDSongListSort } from '/@/shared/api/navidrome/navidrome-types';
+import { NDRadioListSort, NDSongListSort, ndType } from '/@/shared/api/navidrome/navidrome-types';
 import { ssNormalize } from '/@/shared/api/subsonic/subsonic-normalize';
 import { getFeatures, hasFeature, hasFeatureWithVersion, VersionInfo } from '/@/shared/api/utils';
 import {
@@ -141,33 +141,27 @@ export const NavidromeController: InternalControllerEndpoint = {
         return null;
     },
     authenticate: async (url, body) => {
-        if (body.action && body.action !== 'password') {
-            throw new Error('Navidrome does not support this authentication method');
-        }
-
-        if (typeof body.password !== 'string' || typeof body.username !== 'string') {
-            throw new Error('Navidrome authentication requires a username and password');
-        }
-
-        const cleanServerUrl = url.replace(/\/$/, '');
-
-        const res = await ndApiClient({ server: null, url: cleanServerUrl }).authenticate({
-            body: {
-                password: body.password,
-                username: body.username,
-            },
-        });
+        const client = ndApiClient({ server: null, url: url.replace(/\/$/, '') });
+        const res =
+            body.action === 'emos'
+                ? await client.authenticateEmos({ body: { token: body.token } })
+                : await client.authenticate({
+                      body: { password: body.password, username: body.username },
+                  });
 
         if (res.status !== 200) {
-            throw new Error('Failed to authenticate');
+            const data: unknown = res.body.data;
+            const message = data && typeof data === 'object' && 'error' in data ? data.error : null;
+            throw new Error(typeof message === 'string' ? message : 'Failed to authenticate');
         }
 
+        const data = ndType._response.authenticate.parse(res.body.data);
         return {
-            credential: `u=${body.username}&s=${res.body.data.subsonicSalt}&t=${res.body.data.subsonicToken}`,
-            isAdmin: Boolean(res.body.data.isAdmin),
-            ndCredential: res.body.data.token,
-            userId: res.body.data.id,
-            username: res.body.data.username,
+            credential: new URLSearchParams({ jwt: data.token, u: data.username }).toString(),
+            isAdmin: data.isAdmin,
+            ndCredential: data.token,
+            userId: data.id,
+            username: data.username,
         };
     },
     createFavorite: SubsonicController.createFavorite,
@@ -804,7 +798,6 @@ export const NavidromeController: InternalControllerEndpoint = {
             ...navidromeFeatures,
             publicPlaylist: [1],
             [ServerFeature.ALBUM_YES_NO_RATING_FILTER]: [1],
-            [ServerFeature.JUKEBOX]: [1],
             [ServerFeature.MUSIC_FOLDER_MULTISELECT]: [1],
         };
 
@@ -1068,7 +1061,6 @@ export const NavidromeController: InternalControllerEndpoint = {
             totalRecordCount: Number(res.body.headers.get('x-total-count') || 0),
         };
     },
-    jukeboxControl: SubsonicController.jukeboxControl,
     movePlaylistItem: async (args) => {
         const { apiClientProps, query } = args;
 

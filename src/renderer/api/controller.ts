@@ -1,7 +1,5 @@
 import i18n from '/@/i18n/i18n';
-import { JellyfinController } from '/@/renderer/api/jellyfin/jellyfin-controller';
 import { NavidromeController } from '/@/renderer/api/navidrome/navidrome-controller';
-import { SubsonicController } from '/@/renderer/api/subsonic/subsonic-controller';
 import { mergeMusicFolderId } from '/@/renderer/api/utils-music-folder';
 import { getServerById, useAuthStore, useSettingsStore } from '/@/renderer/store';
 import { logger } from '/@/renderer/utils/logger';
@@ -14,16 +12,8 @@ import {
     SetPlaylistSongsResponse,
 } from '/@/shared/types/domain-types';
 
-type ApiController = {
-    jellyfin: InternalControllerEndpoint;
-    navidrome: InternalControllerEndpoint;
-    subsonic: InternalControllerEndpoint;
-};
-
-const endpoints: ApiController = {
-    jellyfin: JellyfinController,
-    navidrome: NavidromeController,
-    subsonic: SubsonicController,
+const endpoints: Partial<Record<ServerType, InternalControllerEndpoint>> = {
+    [ServerType.NAVIDROME]: NavidromeController,
 };
 
 const SENSITIVE_KEY_PATTERN = /password|token|credential|authorization|secret|cookie/i;

@@ -4,6 +4,8 @@ import type ReactPlayer from 'react-player';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { playerHandoff } from './engine/player-handoff';
+
 import { eventEmitter } from '/@/renderer/events/event-emitter';
 import {
     WebPlayerEngine,
@@ -47,7 +49,16 @@ export function WebPlayer() {
     const volume = usePlayerVolume();
     const { audioFadeOnStatusChange, preservePitch, transcode } = usePlaybackSettings();
 
-    const [localPlayerStatus, setLocalPlayerStatus] = useState<PlayerStatus>(status);
+    const pendingLocalSeekRef = useRef(-1);
+
+    const [localPlayerStatus, setLocalPlayerStatus] = useState<PlayerStatus>(() => {
+        if (playerHandoff.pendingLocalSeek > 0) {
+            pendingLocalSeekRef.current = playerHandoff.pendingLocalSeek;
+            playerHandoff.pendingLocalSeek = -1;
+            return PlayerStatus.PAUSED;
+        }
+        return status;
+    });
     const [isTransitioning, setIsTransitioning] = useState<boolean | string>(false);
     const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -89,13 +100,13 @@ export function WebPlayer() {
                 }, PLAY_PAUSE_FADE_INTERVAL);
             });
 
-            if (status === PlayerStatus.PAUSED) {
+            if (status === PlayerStatus.PLAYING) {
+                setLocalPlayerStatus(status);
+                await promise;
+            } else {
                 await promise;
                 setLocalPlayerStatus(status);
                 playerRef.current?.setVolume(startVolume);
-            } else if (status === PlayerStatus.PLAYING) {
-                setLocalPlayerStatus(status);
-                await promise;
             }
         },
         [],
@@ -125,6 +136,14 @@ export function WebPlayer() {
         (e: PlayerOnProgressProps) => {
             if (!playerRef.current?.player1()) {
                 return;
+            }
+
+            if (usePlayerStoreBase.getState().player.status !== PlayerStatus.PLAYING) {
+                return;
+            }
+
+            if (num === 1) {
+                setTimestamp(e.playedSeconds);
             }
 
             if (repeat === PlayerRepeat.ONE) {
@@ -170,6 +189,7 @@ export function WebPlayer() {
             num,
             player2,
             repeat,
+            setTimestamp,
             transitionType,
             volume,
         ],
@@ -179,6 +199,14 @@ export function WebPlayer() {
         (e: PlayerOnProgressProps) => {
             if (!playerRef.current?.player2()) {
                 return;
+            }
+
+            if (usePlayerStoreBase.getState().player.status !== PlayerStatus.PLAYING) {
+                return;
+            }
+
+            if (num === 2) {
+                setTimestamp(e.playedSeconds);
             }
 
             if (repeat === PlayerRepeat.ONE) {
@@ -224,49 +252,49 @@ export function WebPlayer() {
             num,
             player1,
             repeat,
+            setTimestamp,
             transitionType,
             volume,
         ],
     );
 
     const handleOnEndedPlayer1 = useCallback(() => {
-        const promise = new Promise((resolve) => {
-            mediaAutoNext();
-            resolve(true);
-        });
-
-        promise.then(() => {
+        mediaAutoNext();
+        const storeStatus = usePlayerStoreBase.getState().player.status;
+        if (storeStatus === PlayerStatus.PAUSED) {
+            setLocalPlayerStatus(PlayerStatus.PAUSED);
+            playerRef.current?.pause();
+        } else {
             playerRef.current?.player1()?.ref?.getInternalPlayer().pause();
 
-            // If mediaAutoNext resulted in a paused state (e.g. end of queue,
+            // If mediaAutoNext resulted in a stopped/paused state (e.g. end of queue,
             // or pauseOnNextSongEnd flag), stop all audio instead of restoring volume.
             const currentStatus = usePlayerStoreBase.getState().player.status;
-            if (currentStatus === PlayerStatus.PAUSED) {
+            if (currentStatus !== PlayerStatus.PLAYING) {
                 playerRef.current?.pause();
             } else {
                 playerRef.current?.setVolume(volume);
             }
             setIsTransitioning(false);
-        });
+        }
     }, [mediaAutoNext, volume]);
-
     const handleOnEndedPlayer2 = useCallback(() => {
-        const promise = new Promise((resolve) => {
-            mediaAutoNext();
-            resolve(true);
-        });
-
-        promise.then(() => {
+        mediaAutoNext();
+        const storeStatus = usePlayerStoreBase.getState().player.status;
+        if (storeStatus === PlayerStatus.PAUSED) {
+            setLocalPlayerStatus(PlayerStatus.PAUSED);
+            playerRef.current?.pause();
+        } else {
             playerRef.current?.player2()?.ref?.getInternalPlayer().pause();
 
             const currentStatus = usePlayerStoreBase.getState().player.status;
-            if (currentStatus === PlayerStatus.PAUSED) {
+            if (currentStatus !== PlayerStatus.PLAYING) {
                 playerRef.current?.pause();
             } else {
                 playerRef.current?.setVolume(volume);
             }
             setIsTransitioning(false);
-        });
+        }
     }, [mediaAutoNext, volume]);
 
     const player = usePlayer();
@@ -275,6 +303,11 @@ export function WebPlayer() {
         {
             onCurrentSongChange: () => {
                 setIsTransitioning(false);
+            },
+            onPlayerQueueChange: () => {
+                if (usePlayerStoreBase.getState().player.status !== PlayerStatus.PLAYING) {
+                    setIsTransitioning(false);
+                }
             },
             onPlayerSeekToTimestamp: (properties) => {
                 setIsTransitioning(false);
@@ -313,9 +346,9 @@ export function WebPlayer() {
 
                 const status = properties.status;
 
-                // Reset crossfade transition if paused during a crossfade transition
+                // Reset crossfade transition if paused/stopped during a crossfade transition
                 if (
-                    status === PlayerStatus.PAUSED &&
+                    status !== PlayerStatus.PLAYING &&
                     isTransitioning &&
                     transitionType === PlayerStyle.CROSSFADE
                 ) {
@@ -331,18 +364,18 @@ export function WebPlayer() {
                 }
 
                 if (audioFadeOnStatusChange) {
-                    if (status === PlayerStatus.PAUSED) {
-                        fadeAndSetStatus(volume, 0, PLAY_PAUSE_FADE_DURATION, PlayerStatus.PAUSED);
-                    } else if (status === PlayerStatus.PLAYING) {
+                    if (status === PlayerStatus.PLAYING) {
                         fadeAndSetStatus(0, volume, PLAY_PAUSE_FADE_DURATION, PlayerStatus.PLAYING);
+                    } else {
+                        fadeAndSetStatus(volume, 0, PLAY_PAUSE_FADE_DURATION, status);
                     }
                 } else {
-                    if (status === PlayerStatus.PAUSED) {
-                        playerRef.current?.setVolume(volume);
-                        setLocalPlayerStatus(PlayerStatus.PAUSED);
-                    } else if (status === PlayerStatus.PLAYING) {
+                    if (status === PlayerStatus.PLAYING) {
                         playerRef.current?.setVolume(volume);
                         setLocalPlayerStatus(PlayerStatus.PLAYING);
+                    } else {
+                        playerRef.current?.setVolume(volume);
+                        setLocalPlayerStatus(status);
                     }
                 }
             },
@@ -368,7 +401,7 @@ export function WebPlayer() {
     }, []);
 
     useEffect(() => {
-        if (localPlayerStatus !== PlayerStatus.PLAYING) {
+        if (status !== PlayerStatus.PLAYING) {
             return;
         }
 
@@ -388,12 +421,24 @@ export function WebPlayer() {
                 transitionType === PlayerStyle.CROSSFADE ||
                 transitionType === PlayerStyle.GAPLESS
             ) {
-                setTimestamp(Number(currentTime.toFixed(0)));
+                setTimestamp(currentTime);
             }
         }, 500);
 
         return () => clearInterval(interval);
-    }, [localPlayerStatus, num, setTimestamp, transitionType]);
+    }, [status, num, setTimestamp, transitionType]);
+
+    useEffect(() => {
+        if (status !== PlayerStatus.PLAYING || localPlayerStatus === PlayerStatus.PLAYING) {
+            return;
+        }
+        if (fadeIntervalRef.current) {
+            clearInterval(fadeIntervalRef.current);
+            fadeIntervalRef.current = null;
+        }
+        playerRef.current?.setVolume(volume);
+        setLocalPlayerStatus(PlayerStatus.PLAYING);
+    }, [status, localPlayerStatus, volume]);
 
     const calculateReplayGain = useCallback(
         (song: QueueSong): number => {
@@ -450,39 +495,58 @@ export function WebPlayer() {
     );
 
     useEffect(() => {
-        if (!webAudio) return;
+        if (!webAudio || !player1 || !player1Source) return;
 
-        if (player1 && player1Source && num === 1) {
-            const newGain = calculateReplayGain(player1);
+        const newGain = calculateReplayGain(player1);
 
-            // This error SHOULD never happen, as calculateReplayGain is expected to
-            // always return a real value. However, to prevent app crash, check this just in case
-            try {
-                webAudio.gains[0].gain.setValueAtTime(Math.max(0, newGain), 0);
-            } catch (error) {
-                console.error('Error setting gain', error);
-            }
+        // Apply per player slot whenever its song/source is ready so pre-started
+        // inactive players have correct gain before gapless/crossfade transitions.
+        try {
+            webAudio.gains[0].gain.setValueAtTime(
+                Math.max(0, newGain),
+                webAudio.context.currentTime,
+            );
+        } catch (error) {
+            console.error('Error setting gain', error);
         }
-    }, [calculateReplayGain, num, player1, player1Source, volume, webAudio]);
+    }, [calculateReplayGain, player1, player1Source, webAudio]);
 
     useEffect(() => {
-        if (!webAudio) return;
+        if (!webAudio || !player2 || !player2Source) return;
 
-        if (player2 && player2Source && num === 2) {
-            const newGain = calculateReplayGain(player2);
-            try {
-                webAudio.gains[1].gain.setValueAtTime(Math.max(0, newGain), 0);
-            } catch (error) {
-                console.error('Error setting gain', error);
-            }
+        const newGain = calculateReplayGain(player2);
+
+        try {
+            webAudio.gains[1].gain.setValueAtTime(
+                Math.max(0, newGain),
+                webAudio.context.currentTime,
+            );
+        } catch (error) {
+            console.error('Error setting gain', error);
         }
-    }, [calculateReplayGain, num, player1, player2Source, player2, volume, webAudio]);
+    }, [calculateReplayGain, player2, player2Source, webAudio]);
 
     const player1Url = useSongUrl(player1, num === 1, transcode);
     const player2Url = useSongUrl(player2, num === 2, transcode);
 
+    const applyPendingSeekIfNeeded = useCallback(
+        (reactPlayer: ReactPlayer, activeSlot: 1 | 2) => {
+            if (pendingLocalSeekRef.current <= 0) return;
+            if (activeSlot !== num) return;
+            const seekTo = pendingLocalSeekRef.current;
+            pendingLocalSeekRef.current = -1;
+            reactPlayer.seekTo(seekTo, 'seconds');
+            if (status === PlayerStatus.PLAYING) {
+                playerRef.current?.setVolume(volume);
+                setLocalPlayerStatus(PlayerStatus.PLAYING);
+            }
+        },
+        [num, status, volume],
+    );
+
     const handlePlayer1Start = useCallback(
-        async (player: ReactPlayer) => {
+        async (reactPlayer: ReactPlayer) => {
+            applyPendingSeekIfNeeded(reactPlayer, 1);
             if (!webAudio || player1Source) return;
             if (player1Url) {
                 // This should fire once, only if the source is real (meaning we
@@ -492,7 +556,7 @@ export function WebPlayer() {
                 }
             }
 
-            const internal = player.getInternalPlayer() as HTMLMediaElement | undefined;
+            const internal = reactPlayer.getInternalPlayer() as HTMLMediaElement | undefined;
             if (internal) {
                 const { context, gains } = webAudio;
                 const source = context.createMediaElementSource(internal);
@@ -500,11 +564,12 @@ export function WebPlayer() {
                 setPlayer1Source(source);
             }
         },
-        [player1Source, player1Url, webAudio],
+        [applyPendingSeekIfNeeded, player1Source, player1Url, webAudio],
     );
 
     const handlePlayer2Start = useCallback(
-        async (player: ReactPlayer) => {
+        async (reactPlayer: ReactPlayer) => {
+            applyPendingSeekIfNeeded(reactPlayer, 2);
             if (!webAudio || player2Source) return;
             if (player2Url) {
                 if (webAudio.context.state !== 'running') {
@@ -512,7 +577,7 @@ export function WebPlayer() {
                 }
             }
 
-            const internal = player.getInternalPlayer() as HTMLMediaElement | undefined;
+            const internal = reactPlayer.getInternalPlayer() as HTMLMediaElement | undefined;
             if (internal) {
                 const { context, gains } = webAudio;
                 const source = context.createMediaElementSource(internal);
@@ -520,7 +585,7 @@ export function WebPlayer() {
                 setPlayer2Source(source);
             }
         },
-        [player2Source, player2Url, webAudio],
+        [applyPendingSeekIfNeeded, player2Source, player2Url, webAudio],
     );
 
     const handleOnErrorPause = useCallback(() => {
@@ -593,6 +658,13 @@ function crossfadeHandler(args: {
         volume,
     } = args;
     const player = `player${playerNum}`;
+
+    if (usePlayerStoreBase.getState().player.status !== PlayerStatus.PLAYING) {
+        if (isTransitioning) {
+            setIsTransitioning(false);
+        }
+        return;
+    }
 
     // If there is no next song to transition to, ensure we don't enter or stay in a transition
     if (!hasNextSong) {
@@ -701,7 +773,24 @@ function gaplessHandler(args: {
         setIsTransitioning,
     } = args;
 
+    if (usePlayerStoreBase.getState().player.status !== PlayerStatus.PLAYING) {
+        if (isTransitioning) {
+            setIsTransitioning(false);
+        }
+        return null;
+    }
+
     if (!hasNextSong) {
+        nextPlayer.ref?.getInternalPlayer()?.pause();
+        if (isTransitioning) setIsTransitioning(false);
+        return null;
+    }
+
+    // Ignore invalid durations (e.g. during URL load or empty source placeholder)
+    if (!Number.isFinite(duration) || duration < 2) {
+        if (isTransitioning) {
+            setIsTransitioning(false);
+        }
         return null;
     }
 

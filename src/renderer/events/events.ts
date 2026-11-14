@@ -1,4 +1,4 @@
-import { LibraryItem, Song } from '/@/shared/types/domain-types';
+import { FullLyricsMetadata, LibraryItem, Song } from '/@/shared/types/domain-types';
 
 export type AutoDJQueueAddedEventPayload = {
     songCount: number;
@@ -11,14 +11,18 @@ export type EventMap = {
     MEDIA_NEXT: MediaNextEventPayload;
     MEDIA_PREV: MediaPrevEventPayload;
     MPV_RELOAD: MpvReloadEventPayload;
+    PLAYER_LYRICS_FETCHED: PlayerLyricsFetchedEventPayload;
     PLAYER_PLAY: PlayerPlayEventPayload;
     PLAYER_REPEATED: PlayerRepeatedEventPayload;
+    PLAYER_SEEK_TO_TIMESTAMP: PlayerSeekToTimestampEventPayload;
+    PLAYER_STOP: PlayerStopEventPayload;
     PLAYLIST_MOVE_DOWN: PlaylistMoveEventPayload;
     PLAYLIST_MOVE_TO_BOTTOM: PlaylistMoveEventPayload;
     PLAYLIST_MOVE_TO_TOP: PlaylistMoveEventPayload;
     PLAYLIST_MOVE_UP: PlaylistMoveEventPayload;
     PLAYLIST_REORDER: PlaylistReorderEventPayload;
     QUEUE_RESTORED: QueueRestoredEventPayload;
+    TAG_EDITED: TagEditedEventPayload;
     USER_FAVORITE: UserFavoriteEventPayload;
     USER_RATING: UserRatingEventPayload;
 };
@@ -45,6 +49,12 @@ export type MediaPrevEventPayload = {
 
 export type MpvReloadEventPayload = Record<string, never>;
 
+export type PlayerLyricsFetchedEventPayload = {
+    lyrics: FullLyricsMetadata;
+    offsetMs: null | number;
+    synced: boolean;
+};
+
 export type PlayerPlayEventPayload = {
     id: string;
     index: number;
@@ -52,6 +62,16 @@ export type PlayerPlayEventPayload = {
 
 export type PlayerRepeatedEventPayload = {
     index: number;
+};
+
+export type PlayerSeekToTimestampEventPayload = {
+    timestamp: number;
+};
+
+export type PlayerStopEventPayload = {
+    id?: string;
+    index?: number;
+    reset: boolean;
 };
 
 export type PlaylistMoveEventPayload = {
@@ -70,6 +90,12 @@ export type QueueRestoredEventPayload = {
     data: Song[];
     index: number;
     position: number;
+};
+
+export type TagEditedEventPayload = {
+    id: string[];
+    itemType: LibraryItem;
+    serverId: string;
 };
 
 export type UserFavoriteEventPayload = {

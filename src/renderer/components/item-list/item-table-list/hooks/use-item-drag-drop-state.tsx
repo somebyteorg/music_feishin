@@ -4,6 +4,7 @@ import { ItemListStateActions } from '/@/renderer/components/item-list/helpers/i
 import { eventEmitter } from '/@/renderer/events/event-emitter';
 import { PlayerContext } from '/@/renderer/features/player/context/player-context';
 import { useDragDrop } from '/@/renderer/hooks/use-drag-drop';
+import { isUpNextQueueBoundaryDrop } from '/@/renderer/store/player.store';
 import { Folder, LibraryItem, QueueSong, Song } from '/@/shared/types/domain-types';
 import { DragOperation, DragTarget, DragTargetMap } from '/@/shared/types/drag-and-drop';
 
@@ -64,6 +65,7 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                       return draggedItems;
                   },
                   itemType,
+                  metadata: { playlistId },
                   onDragStart: () => {
                       if (!item || !isDataRow) {
                           return;
@@ -138,13 +140,22 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                               args.self.item?.[0] as unknown as { _uniqueId: string }
                           )._uniqueId;
 
+                          // Drop lands in the first Queue section, above Up Next: added songs stay in Queue.
+                          const pinAboveUpNext =
+                              args.edge === 'bottom' &&
+                              isUpNextQueueBoundaryDrop(droppedOnUniqueId, args.edge);
+
                           switch (args.source.type) {
                               case DragTarget.ALBUM: {
                                   playerContext.addToQueueByFetch(
                                       sourceServerId,
                                       args.source.id,
                                       sourceItemType,
-                                      { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                      {
+                                          edge: args.edge,
+                                          pinAboveUpNext,
+                                          uniqueId: droppedOnUniqueId,
+                                      },
                                   );
                                   break;
                               }
@@ -153,7 +164,11 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                       sourceServerId,
                                       args.source.id,
                                       sourceItemType,
-                                      { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                      {
+                                          edge: args.edge,
+                                          pinAboveUpNext,
+                                          uniqueId: droppedOnUniqueId,
+                                      },
                                   );
                                   break;
                               }
@@ -162,7 +177,11 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                       sourceServerId,
                                       args.source.id,
                                       sourceItemType,
-                                      { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                      {
+                                          edge: args.edge,
+                                          pinAboveUpNext,
+                                          uniqueId: droppedOnUniqueId,
+                                      },
                                   );
                                   break;
                               }
@@ -198,7 +217,11 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                           sourceServerId,
                                           folderIds,
                                           LibraryItem.FOLDER,
-                                          { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                          {
+                                              edge: args.edge,
+                                              pinAboveUpNext,
+                                              uniqueId: droppedOnUniqueId,
+                                          },
                                       );
                                   }
 
@@ -206,6 +229,7 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                   if (songs.length > 0) {
                                       playerContext.addToQueueByData(songs, {
                                           edge: args.edge,
+                                          pinAboveUpNext,
                                           uniqueId: droppedOnUniqueId,
                                       });
                                   }
@@ -217,7 +241,11 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                       sourceServerId,
                                       args.source.id,
                                       sourceItemType,
-                                      { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                      {
+                                          edge: args.edge,
+                                          pinAboveUpNext,
+                                          uniqueId: droppedOnUniqueId,
+                                      },
                                   );
                                   break;
                               }
@@ -226,7 +254,11 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                       sourceServerId,
                                       args.source.id,
                                       sourceItemType,
-                                      { edge: args.edge, uniqueId: droppedOnUniqueId },
+                                      {
+                                          edge: args.edge,
+                                          pinAboveUpNext,
+                                          uniqueId: droppedOnUniqueId,
+                                      },
                                   );
                                   break;
                               }
@@ -241,6 +273,7 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                                           sourceItems,
                                           args.edge,
                                           droppedOnUniqueId,
+                                          pinAboveUpNext,
                                       );
                                   }
                                   break;
@@ -248,10 +281,18 @@ export const useItemDragDropState = <TElement extends HTMLElement = HTMLDivEleme
                               case DragTarget.SONG: {
                                   const sourceItems = (args.source.item || []) as Song[];
                                   if (sourceItems.length > 0) {
-                                      playerContext.addToQueueByData(sourceItems, {
-                                          edge: args.edge,
-                                          uniqueId: droppedOnUniqueId,
-                                      });
+                                      const sourcePlaylistId = args.source.metadata?.playlistId as
+                                          string | undefined;
+                                      playerContext.addToQueueByData(
+                                          sourceItems,
+                                          {
+                                              edge: args.edge,
+                                              pinAboveUpNext,
+                                              uniqueId: droppedOnUniqueId,
+                                          },
+                                          undefined,
+                                          sourcePlaylistId ?? null,
+                                      );
                                   }
                                   break;
                               }

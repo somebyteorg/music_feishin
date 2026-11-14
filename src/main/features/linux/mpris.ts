@@ -1,11 +1,13 @@
 import { ipcMain } from 'electron';
 import Player from 'mpris-service';
 
-import { getMainWindow } from '/@/main/index';
+import { getMainWindow, showMainWindow } from '/@/main/index';
+import log from '/@/main/logger';
 import { QueueSong } from '/@/shared/types/domain-types';
 import { PlayerRepeat, PlayerStatus } from '/@/shared/types/types';
 
 const mprisPlayer = Player({
+    desktopEntry: 'org.jeffvli.feishin',
     identity: 'Feishin',
     maximumRate: 1.0,
     minimumRate: 1.0,
@@ -21,7 +23,7 @@ mprisPlayer.on('quit', () => {
 });
 
 const hasData = (): boolean => {
-    return mprisPlayer.metadata && !!mprisPlayer.metadata['mpris:length'];
+    return mprisPlayer.metadata && !!mprisPlayer.metadata['mpris:trackid'];
 };
 
 mprisPlayer.on('stop', () => {
@@ -108,7 +110,7 @@ mprisPlayer.on('seek', (event: number) => {
 });
 
 mprisPlayer.on('raise', () => {
-    getMainWindow()?.show();
+    showMainWindow();
 });
 
 ipcMain.on('update-position', (_event, arg: number) => {
@@ -124,7 +126,12 @@ ipcMain.on('update-volume', (_event, volume) => {
 });
 
 ipcMain.on('update-playback', (_event, status: PlayerStatus) => {
-    mprisPlayer.playbackStatus = status === PlayerStatus.PLAYING ? 'Playing' : 'Paused';
+    mprisPlayer.playbackStatus =
+        status === PlayerStatus.PLAYING
+            ? 'Playing'
+            : status === PlayerStatus.STOPPED
+              ? 'Stopped'
+              : 'Paused';
 });
 
 const REPEAT_TO_MPRIS: Record<PlayerRepeat, string> = {
@@ -139,6 +146,10 @@ ipcMain.on('update-repeat', (_event, arg: PlayerRepeat) => {
 
 ipcMain.on('update-shuffle', (_event, shuffle: boolean) => {
     mprisPlayer.shuffle = shuffle;
+});
+
+ipcMain.on('update-lyrics', (_event, lyrics: string) => {
+    mprisPlayer.metadata['xesam:asText'] = lyrics;
 });
 
 ipcMain.on(
@@ -197,7 +208,7 @@ ipcMain.on(
                 'xesam:userRating': song.userRating ? song.userRating / 5 : null,
             };
         } catch (err) {
-            console.error(err);
+            log.error(err);
         }
     },
 );

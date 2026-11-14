@@ -5,6 +5,7 @@ export enum ServerFeature {
     ARTIST_IMAGE_UPLOAD = 'artistImageUpload',
     BFR = 'bfr',
     INTERNET_RADIO_IMAGE_UPLOAD = 'internetRadioImageUpload',
+    JUKEBOX = 'jukebox',
     LYRICS_MULTIPLE_STRUCTURED = 'lyricsMultipleStructured',
     LYRICS_SINGLE_STRUCTURED = 'lyricsSingleStructured',
     MUSIC_FOLDER_MULTISELECT = 'musicFolderMultiselect',
@@ -18,6 +19,7 @@ export enum ServerFeature {
     SHARING_ALBUM_SONG = 'sharingAlbumSong',
     SIMILAR_SONGS_MUSIC_FOLDER = 'similarSongsMusicFolder',
     TAGS = 'tags',
+    TOP_SONGS_BY_ARTIST_ID = 'topSongsByArtistId',
     TRACK_ALBUM_ARTIST_SEARCH = 'trackAlbumArtistSearch',
     TRACK_YES_NO_RATING_FILTER = 'trackYesNoRatingFilter',
 }

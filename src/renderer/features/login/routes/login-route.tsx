@@ -1,11 +1,15 @@
 import isElectron from 'is-electron';
 import { nanoid } from 'nanoid/non-secure';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router';
 
 import { api } from '/@/renderer/api';
 import { PageHeader } from '/@/renderer/components/page-header/page-header';
+import {
+    findExistingServerLockServer,
+    normalizeServerUrl,
+} from '/@/renderer/features/action-required/utils/server-lock';
 import {
     isLegacyAuth,
     isServerLock,
@@ -14,11 +18,18 @@ import JellyfinIcon from '/@/renderer/features/servers/assets/jellyfin.png';
 import NavidromeIcon from '/@/renderer/features/servers/assets/navidrome.png';
 import SubsonicIcon from '/@/renderer/features/servers/assets/opensubsonic.png';
 import { IgnoreCorsSslSwitches } from '/@/renderer/features/servers/components/ignore-cors-ssl-switches';
+import { JellyfinQuickConnectButton } from '/@/renderer/features/servers/components/jellyfin-quick-connect-button';
+import {
+    JellyfinSignInMethod,
+    JellyfinSignInMethodPicker,
+} from '/@/renderer/features/servers/components/jellyfin-sign-in-method-picker';
+import { useJellyfinQuickConnect } from '/@/renderer/features/servers/hooks/use-jellyfin-quick-connect';
 import { AnimatedPage } from '/@/renderer/features/shared/components/animated-page';
 import { PageErrorBoundary } from '/@/renderer/features/shared/components/page-error-boundary';
 import { AppRoute } from '/@/renderer/router/routes';
 import {
     getServerById,
+    useAuthStore,
     useAuthStoreActions,
     useCurrentServer,
     useServerList,
@@ -51,12 +62,10 @@ const SERVER_NAMES: Record<ServerType, string> = {
     [ServerType.SUBSONIC]: 'OpenSubsonic',
 };
 
-const normalizeUrl = (url: string) => url.replace(/\/$/, '');
-
 const LoginRoute = () => {
     const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
-    const { addServer, setCurrentServer, updateServer } = useAuthStoreActions();
+    const { addServer, deleteServer, setCurrentServer, updateServer } = useAuthStoreActions();
     const currentServer = useCurrentServer();
     const serverList = useServerList();
 
@@ -102,6 +111,66 @@ const LoginRoute = () => {
             username: '',
         },
     });
+
+    const [signInMethod, setSignInMethod] = useState<JellyfinSignInMethod>('password');
+    const showQuickConnect = serverType === ServerType.JELLYFIN && signInMethod === 'quickConnect';
+
+    const {
+        code: quickConnectCode,
+        isLoading: isQuickConnectLoading,
+        start: startQuickConnect,
+        stop: stopQuickConnect,
+    } = useJellyfinQuickConnect({
+        onAuthenticated: (data) => {
+            const normalizedUrl = normalizeServerUrl(serverUrl);
+            const normalizedRemoteURL = normalizeServerUrl(remoteUrl);
+            const existingServer = serverLock
+                ? findExistingServerLockServer(serverList, normalizedUrl, serverType)
+                : undefined;
+
+            const serverId = existingServer?.id ?? nanoid();
+            const serverItem: ServerListItemWithCredential = {
+                credential: data.credential,
+                id: serverId,
+                isAdmin: data.isAdmin,
+                name: serverName,
+                remoteUrl: normalizedRemoteURL,
+                type: serverType as ServerType,
+                url: normalizedUrl,
+                userId: data.userId,
+                username: data.username,
+            };
+
+            if (existingServer) {
+                updateServer(existingServer.id, {
+                    credential: data.credential,
+                    isAdmin: data.isAdmin,
+                    name: serverName,
+                    remoteUrl: normalizedRemoteURL,
+                    url: normalizedUrl,
+                    userId: data.userId,
+                    username: data.username,
+                });
+                const updated = getServerById(existingServer.id);
+                if (updated) setCurrentServer(updated);
+            } else {
+                addServer(serverItem);
+                setCurrentServer(serverItem);
+            }
+
+            if (serverLock) {
+                Object.values(useAuthStore.getState().serverList).forEach((server) => {
+                    if (server.id !== serverId) deleteServer(server.id);
+                });
+            }
+
+            toast.success({ message: t('form.addServer.success') });
+        },
+    });
+
+    useEffect(() => {
+        if (!showQuickConnect) stopQuickConnect();
+    }, [showQuickConnect, stopQuickConnect]);
 
     // If server lock is not enabled, or we already have a server, redirect to home
     if (currentServer) {
@@ -151,15 +220,16 @@ const LoginRoute = () => {
                 });
             }
 
-            const normalizedUrl = normalizeUrl(serverUrl);
-            const normalizedRemoteURL = normalizeUrl(remoteUrl);
-            const existingServer =
-                serverLock &&
-                Object.values(serverList).find((s) => normalizeUrl(s.url) === normalizedUrl);
+            const normalizedUrl = normalizeServerUrl(serverUrl);
+            const normalizedRemoteURL = normalizeServerUrl(remoteUrl);
+            const existingServer = serverLock
+                ? findExistingServerLockServer(serverList, normalizedUrl, serverType)
+                : undefined;
 
+            const serverId = existingServer?.id ?? nanoid();
             const serverItem: ServerListItemWithCredential = {
                 credential: data.credential,
-                id: nanoid(),
+                id: serverId,
                 isAdmin: data.isAdmin,
                 name: serverName,
                 remoteUrl: normalizedRemoteURL,
@@ -173,6 +243,9 @@ const LoginRoute = () => {
                 const updates: Partial<ServerListItemWithCredential> = {
                     credential: data.credential,
                     isAdmin: data.isAdmin,
+                    name: serverName,
+                    remoteUrl: normalizedRemoteURL,
+                    url: normalizedUrl,
                     userId: data.userId,
                     username: data.username,
                 };
@@ -190,12 +263,20 @@ const LoginRoute = () => {
                 setCurrentServer(serverItem);
             }
 
+            if (serverLock) {
+                Object.values(useAuthStore.getState().serverList).forEach((server) => {
+                    if (server.id !== serverId) {
+                        deleteServer(server.id);
+                    }
+                });
+            }
+
             toast.success({
                 message: t('form.addServer.success'),
             });
 
             if (localSettings && values.password) {
-                const saved = await localSettings.passwordSet(values.password, serverItem.id);
+                const saved = await localSettings.passwordSet(values.password, serverId);
                 if (!saved) {
                     toast.error({
                         message: t('form.addServer.error', {
@@ -212,7 +293,7 @@ const LoginRoute = () => {
         return setIsLoading(false);
     });
 
-    const isSubmitDisabled = !form.values.username || !form.values.password;
+    const isSubmitDisabled = !showQuickConnect && (!form.values.username || !form.values.password);
     const serverIcon = SERVER_ICONS[serverType as ServerType];
     const serverDisplayName = SERVER_NAMES[serverType as ServerType];
 
@@ -241,37 +322,61 @@ const LoginRoute = () => {
                             </Stack>
 
                             <Stack gap="md">
-                                <TextInput
-                                    data-autofocus
-                                    label={t('form.addServer.input', {
-                                        context: 'username',
-                                    })}
-                                    required
-                                    variant="filled"
-                                    {...form.getInputProps('username')}
-                                />
-                                <PasswordInput
-                                    label={t('form.addServer.input', {
-                                        context: 'password',
-                                    })}
-                                    required
-                                    variant="filled"
-                                    {...form.getInputProps('password')}
-                                />
                                 <IgnoreCorsSslSwitches />
+                                {serverType === ServerType.JELLYFIN && (
+                                    <JellyfinSignInMethodPicker
+                                        onChange={(method) => {
+                                            setSignInMethod(method);
+                                            if (method !== 'quickConnect') stopQuickConnect();
+                                        }}
+                                        value={signInMethod}
+                                    />
+                                )}
+                                {!showQuickConnect && (
+                                    <>
+                                        <TextInput
+                                            data-autofocus
+                                            label={t('form.addServer.input', {
+                                                context: 'username',
+                                            })}
+                                            required
+                                            variant="filled"
+                                            {...form.getInputProps('username')}
+                                        />
+                                        <PasswordInput
+                                            label={t('form.addServer.input', {
+                                                context: 'password',
+                                            })}
+                                            required
+                                            variant="filled"
+                                            {...form.getInputProps('password')}
+                                        />
+                                    </>
+                                )}
                             </Stack>
 
-                            <Button
-                                disabled={isSubmitDisabled}
-                                fullWidth
-                                loading={isLoading}
-                                type="submit"
-                                variant="filled"
-                            >
-                                {t('common.login', {
-                                    defaultValue: 'Login',
-                                })}
-                            </Button>
+                            {!showQuickConnect && (
+                                <Button
+                                    disabled={isSubmitDisabled}
+                                    fullWidth
+                                    loading={isLoading}
+                                    type="submit"
+                                    variant="filled"
+                                >
+                                    {t('common.login', {
+                                        defaultValue: 'Login',
+                                    })}
+                                </Button>
+                            )}
+                            {showQuickConnect && (
+                                <JellyfinQuickConnectButton
+                                    code={quickConnectCode}
+                                    isLoading={isQuickConnectLoading}
+                                    onStart={() => startQuickConnect(serverUrl)}
+                                    onStop={stopQuickConnect}
+                                    url={serverUrl}
+                                />
+                            )}
                         </Stack>
                     </form>
                 </Paper>

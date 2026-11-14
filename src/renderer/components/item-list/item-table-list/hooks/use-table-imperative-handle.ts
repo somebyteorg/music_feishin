@@ -4,11 +4,15 @@ import { ItemListStateActions } from '/@/renderer/components/item-list/helpers/i
 import { ItemListHandle } from '/@/renderer/components/item-list/types';
 
 interface UseTableImperativeHandleProps {
-    enableHeader: boolean;
+    autoScrollToActiveRow: boolean;
     handleRef: React.RefObject<ItemListHandle | null>;
     internalState: ItemListStateActions;
+    mapDataIndexToRowIndex: (dataIndex: number) => number;
     ref?: React.Ref<ItemListHandle>;
-    scrollToTableIndex: (index: number, options?: { align?: 'bottom' | 'center' | 'top' }) => void;
+    scrollToTableIndex: (
+        index: number,
+        options?: { align?: 'bottom' | 'center' | 'top'; followActiveRow?: boolean },
+    ) => void;
     scrollToTableOffset: (offset: number) => void;
 }
 
@@ -16,9 +20,10 @@ interface UseTableImperativeHandleProps {
  * Hook to set up the imperative handle for ItemTableList, providing scroll methods and internal state.
  */
 export const useTableImperativeHandle = ({
-    enableHeader,
+    autoScrollToActiveRow,
     handleRef,
     internalState,
+    mapDataIndexToRowIndex,
     ref,
     scrollToTableIndex,
     scrollToTableOffset,
@@ -27,13 +32,22 @@ export const useTableImperativeHandle = ({
         () => ({
             internalState,
             scrollToIndex: (index: number, options?: { align?: 'bottom' | 'center' | 'top' }) => {
-                scrollToTableIndex(enableHeader ? index + 1 : index, options);
+                scrollToTableIndex(mapDataIndexToRowIndex(index), {
+                    ...options,
+                    followActiveRow: autoScrollToActiveRow,
+                });
             },
             scrollToOffset: (offset: number) => {
                 scrollToTableOffset(offset);
             },
         }),
-        [enableHeader, internalState, scrollToTableIndex, scrollToTableOffset],
+        [
+            autoScrollToActiveRow,
+            internalState,
+            mapDataIndexToRowIndex,
+            scrollToTableIndex,
+            scrollToTableOffset,
+        ],
     );
 
     useImperativeHandle(ref, () => imperativeHandle);

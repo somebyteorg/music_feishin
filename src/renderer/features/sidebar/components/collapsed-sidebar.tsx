@@ -6,10 +6,12 @@ import { Link, NavLink, useNavigate } from 'react-router';
 
 import styles from './collapsed-sidebar.module.css';
 
+import { useScanStatus } from '/@/renderer/features/shared/hooks/use-scan-status';
 import { CollapsedSidebarButton } from '/@/renderer/features/sidebar/components/collapsed-sidebar-button';
 import { CollapsedSidebarItem } from '/@/renderer/features/sidebar/components/collapsed-sidebar-item';
 import { getCollectionTo } from '/@/renderer/features/sidebar/components/sidebar-collection-list';
 import { SidebarIcon } from '/@/renderer/features/sidebar/components/sidebar-icon';
+import { CollapsedSidebarPlaylistList } from '/@/renderer/features/sidebar/components/sidebar-playlist-list';
 import { AppMenu } from '/@/renderer/features/titlebar/components/app-menu';
 import { AppRoute } from '/@/renderer/router/routes';
 import {
@@ -17,6 +19,7 @@ import {
     useCollections,
     useSidebarCollapsedNavigation,
     useSidebarItems,
+    useSidebarPlaylistList,
     useWindowSettings,
 } from '/@/renderer/store';
 import { DropdownMenu } from '/@/shared/components/dropdown-menu/dropdown-menu';
@@ -35,6 +38,9 @@ export const CollapsedSidebar = () => {
     const { windowBarStyle } = useWindowSettings();
     const sidebarCollapsedNavigation = useSidebarCollapsedNavigation();
     const sidebarItems = useSidebarItems();
+    const sidebarPlaylistList = useSidebarPlaylistList();
+    const { isScanning } = useScanStatus();
+
     const translatedSidebarItemMap = useMemo(
         () => ({
             Albums: t('page.sidebar.albums'),
@@ -94,7 +100,14 @@ export const CollapsedSidebar = () => {
                         <CollapsedSidebarItem
                             activeIcon={null}
                             component={Flex}
-                            icon={<Icon fill="muted" icon="menu" size="3xl" />}
+                            icon={
+                                <Icon
+                                    animate={isScanning ? 'spin' : undefined}
+                                    fill="muted"
+                                    icon={isScanning ? 'spinner' : 'menu'}
+                                    size="3xl"
+                                />
+                            }
                             label={t('common.menu')}
                             style={{
                                 cursor: 'pointer',
@@ -164,6 +177,7 @@ export const CollapsedSidebar = () => {
                         />
                     ),
                 )}
+                {sidebarPlaylistList && <CollapsedSidebarPlaylistList />}
             </ScrollArea>
         </motion.div>
     );

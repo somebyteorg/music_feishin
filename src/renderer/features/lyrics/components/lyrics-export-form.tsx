@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import i18n from '/@/i18n/i18n';
+import { normalizeLyrics } from '/@/renderer/features/lyrics/api/lyrics-utils';
 import { Button } from '/@/shared/components/button/button';
 import { Checkbox } from '/@/shared/components/checkbox/checkbox';
 import { Code } from '/@/shared/components/code/code';
@@ -20,6 +21,31 @@ interface LyricsExportFormProps {
     synced: boolean;
 }
 
+export function lyricsMetadataToLrc(lyrics: FullLyricsMetadata, offsetMs: number, synced: boolean) {
+    if (Array.isArray(lyrics.lyrics)) {
+        const normalizedLyrics = normalizeLyrics(lyrics.lyrics);
+
+        if (!synced) {
+            return normalizedLyrics.map((lyric) => lyric.text).join('\n') + '\n';
+        }
+
+        const contents = normalizedLyrics
+            .map(
+                (lyric) =>
+                    `[${formatDuration(lyric.startMs, { leading: true, ms: true })}]${lyric.text}`,
+            )
+            .join('\n');
+
+        return `[ar:${lyrics.artist}]
+[ti:${lyrics.name}]
+[offset:${offsetMs + (lyrics.offsetMs ?? 0)}]
+${contents}
+`;
+    }
+
+    return lyrics.lyrics;
+}
+
 export const LyricsExportForm = ({ lyrics, offsetMs, synced }: LyricsExportFormProps) => {
     const { t } = useTranslation();
 
@@ -31,33 +57,8 @@ export const LyricsExportForm = ({ lyrics, offsetMs, synced }: LyricsExportFormP
     });
 
     const displayedLyrics = useMemo(() => {
-        if (form.values.synced && Array.isArray(lyrics.lyrics)) {
-            const contents = lyrics.lyrics
-                .map(
-                    (lyric) =>
-                        `[${formatDuration(lyric[0], { leading: true, ms: true })}]${lyric[1]}`,
-                )
-                .join('\n');
-
-            return `[ar:${lyrics.artist}]
-[ti:${lyrics.name}]
-[offset:${form.values.offsetMs + (lyrics.offsetMs ?? 0)}]
-${contents}
-`;
-        } else {
-            if (Array.isArray(lyrics.lyrics)) {
-                return lyrics.lyrics.map((lyric) => lyric[1]).join('\n') + '\n';
-            }
-            return lyrics.lyrics;
-        }
-    }, [
-        form.values.offsetMs,
-        form.values.synced,
-        lyrics.artist,
-        lyrics.lyrics,
-        lyrics.name,
-        lyrics.offsetMs,
-    ]);
+        return lyricsMetadataToLrc(lyrics, offsetMs, synced);
+    }, [lyrics, offsetMs, synced]);
 
     const exportLyrics = useCallback(() => {
         const extension = form.values.synced ? '.lrc' : '.txt';

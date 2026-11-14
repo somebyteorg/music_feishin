@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { ReactNode, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useParams } from 'react-router';
 
@@ -18,8 +18,13 @@ import {
 } from '/@/renderer/features/shared/components/library-header';
 import { LibraryHeaderBar } from '/@/renderer/features/shared/components/library-header-bar';
 import { ListSearchInput } from '/@/renderer/features/shared/components/list-search-input';
+import { getPlaylistLeafName } from '/@/renderer/features/sidebar/components/playlist-folder-tree';
 import { AppRoute } from '/@/renderer/router/routes';
-import { useCurrentServer } from '/@/renderer/store';
+import {
+    useCurrentServer,
+    useSidebarPlaylistFolders,
+    useSidebarPlaylistFolderSeparator,
+} from '/@/renderer/store';
 import { formatDurationString } from '/@/renderer/utils';
 import { replaceURLWithHTMLLinks } from '/@/renderer/utils/linkify';
 import { hasFeature } from '/@/shared/api/utils';
@@ -35,10 +40,8 @@ import { ServerFeature } from '/@/shared/types/features-types';
 import { Play } from '/@/shared/types/types';
 
 interface PlaylistDetailSongListHeaderProps {
+    editActions?: ReactNode;
     isSmartPlaylist?: boolean;
-    onConvertToSmart?: () => void;
-    onDelete?: () => void;
-    onToggleQueryBuilder?: () => void;
 }
 
 function ImageUploadOverlay({
@@ -97,6 +100,7 @@ function ImageUploadOverlay({
 }
 
 export const PlaylistDetailSongListHeader = ({
+    editActions,
     isSmartPlaylist,
 }: PlaylistDetailSongListHeaderProps) => {
     const { t } = useTranslation();
@@ -112,6 +116,14 @@ export const PlaylistDetailSongListHeader = ({
 
     const playlistDuration = detailQuery?.data?.duration;
     const playlistDescription = detailQuery?.data?.description?.trim();
+    const foldersEnabled = useSidebarPlaylistFolders();
+    const folderSeparator = useSidebarPlaylistFolderSeparator();
+    const playlistDisplayName = useMemo(() => {
+        const name = detailQuery?.data?.name;
+        if (!name) return '';
+        if (!foldersEnabled) return name;
+        return getPlaylistLeafName(name, folderSeparator);
+    }, [detailQuery?.data?.name, folderSeparator, foldersEnabled]);
 
     const [collapsed] = useLocalStorage<boolean>({
         defaultValue: false,
@@ -161,7 +173,7 @@ export const PlaylistDetailSongListHeader = ({
                             itemType={LibraryItem.PLAYLIST}
                             songs={listData as Song[]}
                         />
-                        <LibraryHeaderBar.Title>{detailQuery?.data?.name}</LibraryHeaderBar.Title>
+                        <LibraryHeaderBar.Title>{playlistDisplayName}</LibraryHeaderBar.Title>
                         {isSmartPlaylist && (
                             <LibraryHeaderBar.Badge>
                                 {t('entity.smartPlaylist')}
@@ -191,13 +203,16 @@ export const PlaylistDetailSongListHeader = ({
                     }
                     imageUrl={imageUrl}
                     item={{
+                        blurHash: detailQuery?.data?.blurHash,
+                        dominantColor: detailQuery?.data?.dominantColor,
                         imageId: detailQuery?.data?.imageId,
                         imageUrl: detailQuery?.data?.imageUrl,
                         route: AppRoute.PLAYLISTS,
+                        thumbHash: detailQuery?.data?.thumbHash,
                         type: LibraryItem.PLAYLIST,
                     }}
                     onImageFileDrop={canUploadPlaylistImage ? handlePlaylistImageUpload : undefined}
-                    title={detailQuery?.data?.name || ''}
+                    title={playlistDisplayName}
                     topRight={<ListSearchInput />}
                 >
                     <Stack gap="md" w="100%">
@@ -229,7 +244,10 @@ export const PlaylistDetailSongListHeader = ({
                 </LibraryHeader>
             )}
             <FilterBar>
-                <PlaylistDetailSongListHeaderFilters isSmartPlaylist={isSmartPlaylist} />
+                <PlaylistDetailSongListHeaderFilters
+                    editActions={editActions}
+                    isSmartPlaylist={isSmartPlaylist}
+                />
             </FilterBar>
         </Stack>
     );

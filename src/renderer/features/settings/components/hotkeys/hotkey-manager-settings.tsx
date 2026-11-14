@@ -11,7 +11,7 @@ import {
     SettingOption,
     SettingsSection,
 } from '/@/renderer/features/settings/components/settings-section';
-import { useSettingSearchContext } from '/@/renderer/features/settings/context/search-context';
+import { useSettingSearchStore } from '/@/renderer/features/settings/store/search.store';
 import { BindingActions, useHotkeySettings, useSettingsStoreActions } from '/@/renderer/store';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { Checkbox } from '/@/shared/components/checkbox/checkbox';
@@ -70,6 +70,7 @@ const BINDINGS_MAP: Record<BindingActions, string> = {
         context: 'navigateHome',
     }),
     next: i18n.t('setting.hotkey', { context: 'playbackNext' }),
+    nextAlbum: i18n.t('setting.hotkey', { context: 'playbackNextAlbum' }),
     pause: i18n.t('setting.hotkey', { context: 'playbackPause' }),
     play: i18n.t('setting.hotkey', { context: 'playbackPlay' }),
     playPause: i18n.t('setting.hotkey', {
@@ -78,6 +79,7 @@ const BINDINGS_MAP: Record<BindingActions, string> = {
     previous: i18n.t('setting.hotkey', {
         context: 'playbackPrevious',
     }),
+    previousAlbum: i18n.t('setting.hotkey', { context: 'playbackPreviousAlbum' }),
     rate0: i18n.t('setting.hotkey', { context: 'rate0' }),
     rate1: i18n.t('setting.hotkey', { context: 'rate1' }),
     rate2: i18n.t('setting.hotkey', { context: 'rate2' }),
@@ -111,7 +113,7 @@ export const HotkeyManagerSettings = memo(() => {
     const { bindings } = useHotkeySettings();
     const { setSettings } = useSettingsStoreActions();
     const [selected, setSelected] = useState<BindingActions | null>(null);
-    const keyword = useSettingSearchContext();
+    const { search: keyword } = useSettingSearchStore();
 
     const debouncedSetHotkey = debounce(
         (binding: BindingActions, e: KeyboardEvent<HTMLInputElement>) => {

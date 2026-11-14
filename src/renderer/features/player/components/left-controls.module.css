@@ -41,6 +41,14 @@
     }
 }
 
+.toggle-button {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 10;
+    cursor: default;
+}
+
 .playerbar-image {
     display: flex;
     align-items: center;
@@ -70,6 +78,17 @@
     a {
         color: var(--theme-colors-foreground-muted);
     }
+}
+
+.joined-artists {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.joined-artists,
+.joined-artists > * {
+    white-space: nowrap;
 }
 
 .left-controls-container {

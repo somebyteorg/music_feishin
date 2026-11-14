@@ -9,7 +9,9 @@ import styles from './lyrics-search-form.module.css';
 
 import i18n from '/@/i18n/i18n';
 import { lyricsQueries } from '/@/renderer/features/lyrics/api/lyrics-api';
+import { lyricsHasWordCues } from '/@/renderer/features/lyrics/api/lyrics-utils';
 import { openLyricsExportModal } from '/@/renderer/features/lyrics/components/lyrics-export-form';
+import { SynchronizedKaraokeLyrics } from '/@/renderer/features/lyrics/synchronized-karaoke-lyrics';
 import {
     SynchronizedLyrics,
     SynchronizedLyricsProps,
@@ -18,7 +20,7 @@ import {
     UnsynchronizedLyrics,
     UnsynchronizedLyricsProps,
 } from '/@/renderer/features/lyrics/unsynchronized-lyrics';
-import { usePlayerSong } from '/@/renderer/store';
+import { useLyricsSettings, usePlayerSong } from '/@/renderer/store';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { Button } from '/@/shared/components/button/button';
 import { Center } from '/@/shared/components/center/center';
@@ -99,6 +101,7 @@ interface LyricSearchFormProps {
 
 export const LyricsSearchForm = ({ artist, name, onSearchOverride }: LyricSearchFormProps) => {
     const { t } = useTranslation();
+    const { delayMs } = useLyricsSettings();
     const currentSong = usePlayerSong();
     const [selectedResult, setSelectedResult] =
         useState<InternetProviderLyricSearchResponse | null>(null);
@@ -165,12 +168,12 @@ export const LyricsSearchForm = ({ artist, name, onSearchOverride }: LyricSearch
                 artist: selectedResult.artist,
                 lyrics: previewData,
                 name: selectedResult.name,
-                offsetMs: 0,
+                offsetMs: null,
                 remote: true,
                 source: selectedResult.source,
             };
             const synced = Array.isArray(previewData);
-            openLyricsExportModal({ lyrics: lyricsMetadata, offsetMs: 0, synced });
+            openLyricsExportModal({ lyrics: lyricsMetadata, offsetMs: delayMs, synced });
         }
     };
 
@@ -244,7 +247,6 @@ export const LyricsSearchForm = ({ artist, name, onSearchOverride }: LyricSearch
                 {selectedResult && (
                     <Stack style={{ flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                         <ScrollArea
-                            className={styles['lyrics-preview']}
                             style={{
                                 height: '100%',
                                 paddingRight: '1rem',
@@ -253,13 +255,10 @@ export const LyricsSearchForm = ({ artist, name, onSearchOverride }: LyricSearch
                             {isPreviewLoading ? (
                                 <Spinner container />
                             ) : previewData ? (
-                                <div
-                                    className={styles['lyrics-content-wrapper']}
-                                    style={{ width: '100%' }}
-                                >
-                                    {Array.isArray(previewData) ? (
-                                        <SynchronizedLyrics
-                                            style={{ padding: 0 }}
+                                Array.isArray(previewData) ? (
+                                    lyricsHasWordCues(previewData) ? (
+                                        <SynchronizedKaraokeLyrics
+                                            preview
                                             {...({
                                                 artist: selectedResult.artist,
                                                 lyrics: previewData,
@@ -269,17 +268,29 @@ export const LyricsSearchForm = ({ artist, name, onSearchOverride }: LyricSearch
                                             } as SynchronizedLyricsProps)}
                                         />
                                     ) : (
-                                        <UnsynchronizedLyrics
+                                        <SynchronizedLyrics
+                                            preview
                                             {...({
                                                 artist: selectedResult.artist,
                                                 lyrics: previewData,
                                                 name: selectedResult.name,
                                                 remote: true,
                                                 source: selectedResult.source,
-                                            } as UnsynchronizedLyricsProps)}
+                                            } as SynchronizedLyricsProps)}
                                         />
-                                    )}
-                                </div>
+                                    )
+                                ) : (
+                                    <UnsynchronizedLyrics
+                                        preview
+                                        {...({
+                                            artist: selectedResult.artist,
+                                            lyrics: previewData,
+                                            name: selectedResult.name,
+                                            remote: true,
+                                            source: selectedResult.source,
+                                        } as UnsynchronizedLyricsProps)}
+                                    />
+                                )
                             ) : (
                                 <Center>
                                     <Text isMuted>{t('page.fullscreenPlayer.noLyrics')}</Text>

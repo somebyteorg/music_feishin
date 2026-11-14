@@ -105,7 +105,17 @@ const AlbumMetadataTags = ({ album }: AlbumMetadataTagsProps) => {
     const defaultTagItems = useMemo(() => {
         if (!album) return [];
 
-        const releaseTypes = normalizeReleaseTypes(album.releaseTypes ?? [], t).map((type) => ({
+        const releaseTypes = [...(album.releaseTypes ?? [])];
+
+        const hasCompilationReleaseType = releaseTypes.some(
+            (type) => type.toLowerCase() === 'compilation',
+        );
+
+        if (album.isCompilation && !hasCompilationReleaseType) {
+            releaseTypes.push('compilation');
+        }
+
+        const releaseTypeItems = normalizeReleaseTypes(releaseTypes, t).map((type) => ({
             id: type,
             value: titleCase(type),
         }));
@@ -124,24 +134,15 @@ const AlbumMetadataTags = ({ album }: AlbumMetadataTagsProps) => {
 
         const items: Array<{ id: string; value: ReactNode | string | undefined }> = [];
 
-        items.push(
-            ...releaseTypes,
-            {
-                id: 'isCompilation',
-                value: album?.isCompilation ? t('filter.isCompilation') : undefined,
-            },
-            ...releaseCountries,
-            ...releaseStatuses,
-            {
-                id: 'explicitStatus',
-                value:
-                    album.explicitStatus === ExplicitStatus.EXPLICIT
-                        ? t('common.explicit')
-                        : album.explicitStatus === ExplicitStatus.CLEAN
-                          ? t('common.clean')
-                          : undefined,
-            },
-        );
+        items.push(...releaseTypeItems, ...releaseCountries, ...releaseStatuses, {
+            id: 'explicitStatus',
+            value:
+                album.explicitStatus === ExplicitStatus.EXPLICIT
+                    ? t('common.explicit')
+                    : album.explicitStatus === ExplicitStatus.CLEAN
+                      ? t('common.clean')
+                      : undefined,
+        });
 
         return items.filter((item) => item.value);
     }, [album, t]);
@@ -473,7 +474,7 @@ const AlbumMetadataExternalLinks = ({
                         component="a"
                         href={
                             nativeSpotify
-                                ? `spotify:search:${encodeURIComponent(albumArtist || '')}%20${encodeURIComponent(albumName || '')}`
+                                ? `spotify:search:${encodeURIComponent(albumArtist || '').replaceAll('%20', '+')}+${encodeURIComponent(albumName || '').replaceAll('%20', '+')}`
                                 : `https://open.spotify.com/search/${encodeURIComponent(albumArtist || '')}%20${encodeURIComponent(albumName || '')}`
                         }
                         icon="brandSpotify"
@@ -795,6 +796,7 @@ const AlbumDetailSongsTable = ({ songs }: AlbumDetailSongsTableProps) => {
         }
 
         return discGroups.map((discGroup) => ({
+            cellClassName: styles.discGroupRowCell,
             itemCount: discGroup.itemCount,
             render: ({
                 data,

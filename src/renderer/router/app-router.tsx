@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { HashRouter, Route, Routes } from 'react-router';
 
 import { ShuffleAllContextModal } from '/@/renderer/features/player/components/shuffle-all-modal';
+import { SettingsContextModal } from '/@/renderer/features/settings/components/settings-modal';
 import { RouterErrorBoundary } from '/@/renderer/features/shared/components/router-error-boundary';
 import { AuthenticationOutlet } from '/@/renderer/layouts/authentication-outlet';
 import { ResponsiveLayout } from '/@/renderer/layouts/responsive-layout';
@@ -97,6 +98,18 @@ const LyricsSettingsContextModal = (props: any) => (
     </Suspense>
 );
 
+const LazyListConfigSettingsContextModal = lazy(() =>
+    import('/@/renderer/features/shared/components/list-config-settings-modal').then((module) => ({
+        default: module.ListConfigSettingsContextModal,
+    })),
+);
+
+const ListConfigSettingsContextModal = (props: any) => (
+    <Suspense fallback={<Spinner container />}>
+        <LazyListConfigSettingsContextModal {...props} />
+    </Suspense>
+);
+
 const LazyAddToPlaylistContextModal = lazy(() =>
     import('/@/renderer/features/playlists/components/add-to-playlist-context-modal').then(
         (module) => ({
@@ -137,18 +150,6 @@ const UpdatePlaylistContextModal = (props: any) => (
     </Suspense>
 );
 
-const LazySettingsContextModal = lazy(() =>
-    import('/@/renderer/features/settings/components/settings-modal').then((module) => ({
-        default: module.SettingsContextModal,
-    })),
-);
-
-const SettingsContextModal = (props: any) => (
-    <Suspense fallback={<Spinner container />}>
-        <LazySettingsContextModal {...props} />
-    </Suspense>
-);
-
 const LazyShareItemContextModal = lazy(() =>
     import('/@/renderer/features/sharing/components/share-item-context-modal').then((module) => ({
         default: module.ShareItemContextModal,
@@ -175,9 +176,38 @@ const VisualizerSettingsContextModal = (props: any) => (
     </Suspense>
 );
 
+const LazySongEditContextModal = lazy(() =>
+    import('/@/renderer/features/tag-editor/components/song-edit-context-modal').then((module) => ({
+        default: module.SongEditContextModal,
+    })),
+);
+
+const SongEditContextModal = (props: any) => (
+    <Suspense fallback={<Spinner container />}>
+        <LazySongEditContextModal {...props} />
+    </Suspense>
+);
+
+const LazyFullScreenPlayerSettingsContextModal = lazy(() =>
+    import('/@/renderer/features/player/components/full-screen-player-settings-modal').then(
+        (module) => ({
+            default: module.FullScreenPlayerSettingsContextModal,
+        }),
+    ),
+);
+
+const FullScreenPlayerSettingsContextModal = (props: any) => (
+    <Suspense fallback={<Spinner container />}>
+        <LazyFullScreenPlayerSettingsContextModal {...props} />
+    </Suspense>
+);
+
 const appRouterModals = {
     addToPlaylist: AddToPlaylistContextModal,
     base: BaseContextModal,
+    editMetadata: SongEditContextModal,
+    fullScreenPlayerSettings: FullScreenPlayerSettingsContextModal,
+    listConfigSettings: ListConfigSettingsContextModal,
     lyricsSettings: LyricsSettingsContextModal,
     saveAndReplace: SaveAndReplaceContextModal,
     settings: SettingsContextModal,
@@ -189,7 +219,7 @@ const appRouterModals = {
 
 export const AppRouter = () => {
     const router = (
-        <HashRouter unstable_useTransitions={false}>
+        <HashRouter useTransitions={false}>
             <ModalsProvider modals={appRouterModals}>
                 <RouterErrorBoundary>
                     <Routes>
